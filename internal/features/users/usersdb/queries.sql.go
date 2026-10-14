@@ -7,6 +7,7 @@ package usersdb
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -23,23 +24,25 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, name)
-VALUES ($1, $2)
-RETURNING id, email, name, created_at, updated_at
+INSERT INTO users (email, name, password_hash)
+VALUES ($1, $2, $3)
+RETURNING id, email, name, password_hash, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	Email        string `json:"email"`
+	Name         string `json:"name"`
+	PasswordHash string `json:"password_hash"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Name)
+	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Name, arg.PasswordHash)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
+		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -64,9 +67,17 @@ FROM users
 WHERE id = $1
 `
 
-func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
+type GetUserRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error) {
 	row := q.db.QueryRow(ctx, getUser, id)
-	var i User
+	var i GetUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -81,23 +92,31 @@ const listUsers = `-- name: ListUsers :many
 SELECT id, email, name, created_at, updated_at
 FROM users
 ORDER BY created_at DESC, id
-LIMIT $1 OFFSET $2
+LIMIT $2 OFFSET $1
 `
 
 type ListUsersParams struct {
-	PageLimit  int32 `json:"page_limit"`
 	PageOffset int32 `json:"page_offset"`
+	PageLimit  int32 `json:"page_limit"`
 }
 
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, listUsers, arg.PageLimit, arg.PageOffset)
+type ListUsersRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+	rows, err := q.db.Query(ctx, listUsers, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []User{}
+	items := []ListUsersRow{}
 	for rows.Next() {
-		var i User
+		var i ListUsersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
@@ -130,9 +149,17 @@ type UpdateUserParams struct {
 	ID    uuid.UUID `json:"id"`
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
+type UpdateUserRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
 	row := q.db.QueryRow(ctx, updateUser, arg.Name, arg.Email, arg.ID)
-	var i User
+	var i UpdateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
