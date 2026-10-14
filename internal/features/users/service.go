@@ -9,7 +9,7 @@ import (
 
 // Service holds the feature's business rules.
 type Service interface {
-	Create(ctx context.Context, email, name string) (User, error)
+	Create(ctx context.Context, email, name string, password string) (User, error)
 	Get(ctx context.Context, id uuid.UUID) (User, error)
 	List(ctx context.Context, page, perPage int) ([]User, int64, error)
 	Update(ctx context.Context, id uuid.UUID, email, name *string) (User, error)
@@ -20,12 +20,12 @@ type service struct{ repo Repository }
 
 func NewService(repo Repository) Service { return &service{repo: repo} }
 
-func (s *service) Create(ctx context.Context, email, name string) (User, error) {
+func (s *service) Create(ctx context.Context, email, name string, password string) (User, error) {
 	email, name = normalizeEmail(email), strings.TrimSpace(name)
 	if email == "" || name == "" {
 		return User{}, ErrInvalidInput
 	}
-	return s.repo.Create(ctx, email, name)
+	return s.repo.Create(ctx, email, name, password)
 }
 
 func (s *service) Get(ctx context.Context, id uuid.UUID) (User, error) {
@@ -78,5 +78,3 @@ func (s *service) Update(ctx context.Context, id uuid.UUID, email, name *string)
 func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
 }
-
-func normalizeEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
