@@ -6,8 +6,8 @@ SHELL := /bin/bash
 export
 
 # Container engine: `make up` (docker) or `make up CONTAINER=podman`.
-CONTAINER ?= docker
-COMPOSE   ?= $(CONTAINER) compose
+CONTAINER ?= podman
+COMPOSE   ?= $(CONTAINER)-compose
 
 APP       := api
 MODULE    := $(shell go list -m 2>/dev/null)
