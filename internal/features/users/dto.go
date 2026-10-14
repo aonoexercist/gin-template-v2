@@ -7,14 +7,16 @@ import (
 )
 
 type CreateUserRequest struct {
-	Email string `json:"email" binding:"required,email,max=254"`
-	Name  string `json:"name" binding:"required,min=1,max=100"`
+	Email    string `json:"email" binding:"required,email,max=254"`
+	Name     string `json:"name" binding:"required,min=1,max=100"`
+	Password string `json:"password" binding:"required,min=8,max=100"`
 }
 
 // UpdateUserRequest is a partial update: omitted fields are left unchanged.
 type UpdateUserRequest struct {
-	Email *string `json:"email" binding:"omitempty,email,max=254"`
-	Name  *string `json:"name" binding:"omitempty,min=1,max=100"`
+	Email    *string `json:"email" binding:"omitempty,email,max=254"`
+	Name     *string `json:"name" binding:"omitempty,min=1,max=100"`
+	Password *string `json:"password" binding:"omitempty,min=8,max=100"`
 }
 
 type ListUsersQuery struct {
