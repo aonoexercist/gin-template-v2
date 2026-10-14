@@ -11,11 +11,12 @@ import (
 
 // User is the domain model, decoupled from the sqlc row type and the JSON DTO.
 type User struct {
-	ID        uuid.UUID
-	Email     string
-	Name      string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           uuid.UUID
+	Email        string
+	Name         string
+	PasswordHash string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 var (
