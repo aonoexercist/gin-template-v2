@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61.0
+
+  sqlc:
+    name: sqlc generated code is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: sqlc-dev/setup-sqlc@v4
+        with:
+          sqlc-version: "1.27.0"
+      - run: sqlc diff
+
+  migrations:
+    name: migrations apply cleanly (up/down/up)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U app" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: postgres://app:app@localhost:5432/app?sslmode=disable
+      GOOSE_MIGRATION_DIR: db/migrations
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go install github.com/pressly/goose/v3/cmd/goose@v3.22.1
+      - run: goose up && goose down-to 0 && goose up
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build --target runtime -t app:ci .
+      - run: docker build --target migrate -t app-migrate:ci .

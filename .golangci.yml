@@ -1,0 +1,24 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - unconvert
+
+issues:
+  exclude-dirs:
+    - internal/features/.*/.*db   # sqlc generated
+  exclude-rules:
+    - path: _test\.go
+      linters: [gosec]
+    - text: "G115" # int -> int32 conversions are bounded by validation (see users.Service.List)
+      linters: [gosec]
