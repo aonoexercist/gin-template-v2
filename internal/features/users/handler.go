@@ -1,29 +1,16 @@
 package users
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"gin-template-v2/internal/platform/httpx"
-	"gin-template-v2/internal/platform/logger"
 )
 
 type Handler struct{ svc Service }
 
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
-
-// RegisterRoutes mounts the feature on a (versioned) router group.
-func RegisterRoutes(rg *gin.RouterGroup, h *Handler) {
-	g := rg.Group("/users")
-	g.POST("", h.Create)
-	g.GET("", h.List)
-	g.GET("/:id", h.Get)
-	g.PATCH("/:id", h.Update)
-	g.DELETE("/:id", h.Delete)
-}
 
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateUserRequest
@@ -31,7 +18,7 @@ func (h *Handler) Create(c *gin.Context) {
 		httpx.BindError(c, err)
 		return
 	}
-	u, err := h.svc.Create(c.Request.Context(), req.Email, req.Name)
+	u, err := h.svc.Create(c.Request.Context(), req.Email, req.Name, req.Password)
 	if err != nil {
 		h.fail(c, err)
 		return
@@ -106,29 +93,4 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
-}
-
-func parseID(c *gin.Context) (uuid.UUID, bool) {
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		httpx.Error(c, http.StatusBadRequest, "invalid_id", "ID must be a valid UUID")
-		return uuid.Nil, false
-	}
-	return id, true
-}
-
-// fail maps domain errors to HTTP responses; unknown errors are logged and
-// returned as an opaque 500 so internals never leak to clients.
-func (h *Handler) fail(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, ErrNotFound):
-		httpx.Error(c, http.StatusNotFound, "not_found", "User not found")
-	case errors.Is(err, ErrEmailTaken):
-		httpx.Error(c, http.StatusConflict, "email_taken", "Email already in use")
-	case errors.Is(err, ErrInvalidInput):
-		httpx.Error(c, http.StatusUnprocessableEntity, "validation_error", "Invalid input")
-	default:
-		logger.FromContext(c.Request.Context()).Error("users: unexpected error", "error", err)
-		httpx.Error(c, http.StatusInternalServerError, "internal_error", "Internal server error")
-	}
 }
