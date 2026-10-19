@@ -43,6 +43,15 @@ func (h *Handler) fail(c *gin.Context, err error) {
 }
 
 func toUser(u usersdb.User) User {
+	return User{ID: u.ID, Email: u.Email, Name: u.Name, PasswordHash: u.PasswordHash, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
+}
+
+type userRow interface {
+	usersdb.GetUserRow | usersdb.ListUsersRow | usersdb.UpdateUserRow
+}
+
+func rowToUser[T userRow](r T) User {
+	u := usersdb.GetUserRow(r)
 	return User{ID: u.ID, Email: u.Email, Name: u.Name, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
