@@ -25,7 +25,7 @@ func NewRepository(db usersdb.DBTX) Repository {
 }
 
 func (r *pgRepository) Create(ctx context.Context, email, name string, password string) (User, error) {
-	row, err := r.q.CreateUser(ctx, usersdb.CreateUserParams{Email: email, Name: name, Password: password})
+	row, err := r.q.CreateUser(ctx, usersdb.CreateUserParams{Email: email, Name: name, PasswordHash: password})
 	if err != nil {
 		return User{}, mapError(err)
 	}
@@ -37,7 +37,7 @@ func (r *pgRepository) Get(ctx context.Context, id uuid.UUID) (User, error) {
 	if err != nil {
 		return User{}, mapError(err)
 	}
-	return toUser(row), nil
+	return rowToUser(row), nil
 }
 
 func (r *pgRepository) List(ctx context.Context, limit, offset int32) ([]User, error) {
@@ -47,7 +47,7 @@ func (r *pgRepository) List(ctx context.Context, limit, offset int32) ([]User, e
 	}
 	out := make([]User, len(rows))
 	for i, row := range rows {
-		out[i] = toUser(row)
+		out[i] = rowToUser(row)
 	}
 	return out, nil
 }
@@ -62,7 +62,7 @@ func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, email, name *st
 	if err != nil {
 		return User{}, mapError(err)
 	}
-	return toUser(row), nil
+	return rowToUser(row), nil
 }
 
 func (r *pgRepository) Delete(ctx context.Context, id uuid.UUID) error {
