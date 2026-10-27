@@ -64,7 +64,7 @@ func mapError(err error) error {
 		return ErrNotFound
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+	if errors.As(err, &pgErr) {
 		return ErrEmailTaken
 	}
 	return err
