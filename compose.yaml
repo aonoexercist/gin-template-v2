@@ -4,7 +4,7 @@ name: gin-template
 
 services:
   db:
-    image: docker.io/library/postgres:17-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
