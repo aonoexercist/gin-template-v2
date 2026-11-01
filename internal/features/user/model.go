@@ -1,6 +1,6 @@
 // Package users is a feature module: HTTP handler -> service -> repository -> sqlc.
 // Copy this folder as the starting point for a new feature.
-package users
+package user
 
 import (
 	"errors"

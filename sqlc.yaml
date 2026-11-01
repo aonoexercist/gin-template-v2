@@ -13,11 +13,11 @@ sql:
   - name: users
     engine: postgresql
     schema: db/migrations
-    queries: internal/features/users/queries.sql
+    queries: internal/features/user/query.sql
     gen:
       go:
-        package: usersdb
-        out: internal/features/users/usersdb
+        package: userdb
+        out: internal/features/user/userdb
         sql_package: pgx/v5
         emit_json_tags: true
         emit_interface: true

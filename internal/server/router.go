@@ -9,7 +9,7 @@ import (
 
 	"gin-template-v2/internal/config"
 	"gin-template-v2/internal/features/health"
-	"gin-template-v2/internal/features/users"
+	users "gin-template-v2/internal/features/user"
 	"gin-template-v2/internal/platform/httpx"
 	"gin-template-v2/internal/platform/middleware"
 )

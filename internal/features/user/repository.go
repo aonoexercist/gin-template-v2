@@ -1,8 +1,8 @@
-package users
+package user
 
 import (
 	"context"
-	"gin-template-v2/internal/features/users/usersdb"
+	"gin-template-v2/internal/features/user/userdb"
 
 	"github.com/google/uuid"
 )
@@ -17,15 +17,15 @@ type Repository interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
-type pgRepository struct{ q usersdb.Querier }
+type pgRepository struct{ q userdb.Querier }
 
 // NewRepository returns a Postgres-backed Repository. db is typically a *pgxpool.Pool.
-func NewRepository(db usersdb.DBTX) Repository {
-	return &pgRepository{q: usersdb.New(db)}
+func NewRepository(db userdb.DBTX) Repository {
+	return &pgRepository{q: userdb.New(db)}
 }
 
 func (r *pgRepository) Create(ctx context.Context, email, name string, password string) (User, error) {
-	row, err := r.q.CreateUser(ctx, usersdb.CreateUserParams{Email: email, Name: name, PasswordHash: password})
+	row, err := r.q.CreateUser(ctx, userdb.CreateUserParams{Email: email, Name: name, PasswordHash: password})
 	if err != nil {
 		return User{}, mapError(err)
 	}
@@ -41,7 +41,7 @@ func (r *pgRepository) Get(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 func (r *pgRepository) List(ctx context.Context, limit, offset int32) ([]User, error) {
-	rows, err := r.q.ListUsers(ctx, usersdb.ListUsersParams{PageLimit: limit, PageOffset: offset})
+	rows, err := r.q.ListUsers(ctx, userdb.ListUsersParams{PageLimit: limit, PageOffset: offset})
 	if err != nil {
 		return nil, mapError(err)
 	}
@@ -58,7 +58,7 @@ func (r *pgRepository) Count(ctx context.Context) (int64, error) {
 }
 
 func (r *pgRepository) Update(ctx context.Context, id uuid.UUID, email, name *string) (User, error) {
-	row, err := r.q.UpdateUser(ctx, usersdb.UpdateUserParams{ID: id, Email: email, Name: name})
+	row, err := r.q.UpdateUser(ctx, userdb.UpdateUserParams{ID: id, Email: email, Name: name})
 	if err != nil {
 		return User{}, mapError(err)
 	}

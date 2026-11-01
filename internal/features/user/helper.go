@@ -1,4 +1,4 @@
-package users
+package user
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"gin-template-v2/internal/features/users/usersdb"
+	"gin-template-v2/internal/features/user/userdb"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -42,16 +42,16 @@ func (h *Handler) fail(c *gin.Context, err error) {
 	}
 }
 
-func toUser(u usersdb.User) User {
+func toUser(u userdb.User) User {
 	return User{ID: u.ID, Email: u.Email, Name: u.Name, PasswordHash: u.PasswordHash, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
 type userRow interface {
-	usersdb.GetUserRow | usersdb.ListUsersRow | usersdb.UpdateUserRow
+	userdb.GetUserRow | userdb.ListUsersRow | userdb.UpdateUserRow
 }
 
 func rowToUser[T userRow](r T) User {
-	u := usersdb.GetUserRow(r)
+	u := userdb.GetUserRow(r)
 	return User{ID: u.ID, Email: u.Email, Name: u.Name, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
