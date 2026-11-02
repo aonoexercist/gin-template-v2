@@ -37,6 +37,24 @@ func Authenticate(svc auth.Service, cookieName string) gin.HandlerFunc {
 	}
 }
 
+// RequireAdmin ensures the authenticated user has administrator privileges.
+func RequireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user, ok := CurrentUser(c)
+		if !ok {
+			httpx.AbortError(c, http.StatusUnauthorized, "unauthorized", "Authentication required")
+			return
+		}
+
+		if !user.IsAdmin {
+			httpx.AbortError(c, http.StatusForbidden, "forbidden", "Administrator access required")
+			return
+		}
+
+		c.Next()
+	}
+}
+
 // CurrentUser retrieves the authenticated user from the request context.
 func CurrentUser(c *gin.Context) (auth.User, bool) {
 	val, ok := c.Get(ContextUserKey)
