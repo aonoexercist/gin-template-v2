@@ -30,14 +30,23 @@ RETURNING id, email, name, password_hash, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Email        string `json:"email"`
-	Name         string `json:"name"`
-	PasswordHash string `json:"password_hash"`
+	Email        string  `json:"email"`
+	Name         string  `json:"name"`
+	PasswordHash *string `json:"password_hash"`
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+type CreateUserRow struct {
+	ID           uuid.UUID `json:"id"`
+	Email        string    `json:"email"`
+	Name         string    `json:"name"`
+	PasswordHash *string   `json:"password_hash"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Name, arg.PasswordHash)
-	var i User
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
