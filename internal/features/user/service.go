@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Service holds the feature's business rules.
@@ -25,7 +26,12 @@ func (s *service) Create(ctx context.Context, email, name string, password strin
 	if email == "" || name == "" {
 		return User{}, ErrInvalidInput
 	}
-	return s.repo.Create(ctx, email, name, password)
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return User{}, err
+	}
+	return s.repo.Create(ctx, email, name, string(hash))
 }
 
 func (s *service) Get(ctx context.Context, id uuid.UUID) (User, error) {
