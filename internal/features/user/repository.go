@@ -25,7 +25,7 @@ func NewRepository(db userdb.DBTX) Repository {
 }
 
 func (r *pgRepository) Create(ctx context.Context, email, name string, password string) (User, error) {
-	row, err := r.q.CreateUser(ctx, userdb.CreateUserParams{Email: email, Name: name, PasswordHash: password})
+	row, err := r.q.CreateUser(ctx, userdb.CreateUserParams{Email: email, Name: name, PasswordHash: &password})
 	if err != nil {
 		return User{}, mapError(err)
 	}
