@@ -47,7 +47,7 @@ func toUser(u userdb.CreateUserRow) User {
 	if u.PasswordHash != nil {
 		pw = *u.PasswordHash
 	}
-	return User{ID: u.ID, Email: u.Email, Name: u.Name, PasswordHash: pw, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
+	return User{ID: u.ID, Email: u.Email, Name: u.Name, PasswordHash: pw, IsAdmin: u.IsAdmin, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
 type userRow interface {
@@ -56,7 +56,7 @@ type userRow interface {
 
 func rowToUser[T userRow](r T) User {
 	u := userdb.GetUserRow(r)
-	return User{ID: u.ID, Email: u.Email, Name: u.Name, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
+	return User{ID: u.ID, Email: u.Email, Name: u.Name, IsAdmin: u.IsAdmin, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
 // mapError translates driver errors into domain errors.

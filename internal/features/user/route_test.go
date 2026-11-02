@@ -51,8 +51,17 @@ func (m *mockUserService) Delete(ctx context.Context, id uuid.UUID) error {
 
 func dummyAuthMiddleware(c *gin.Context) {
 	cookie, err := c.Cookie("sid")
-	if err != nil || cookie != "valid-cookie" {
+	if err != nil || cookie == "" {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	c.Next()
+}
+
+func dummyAdminMiddleware(c *gin.Context) {
+	cookie, _ := c.Cookie("sid")
+	if cookie != "admin-cookie" {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 	c.Next()
@@ -64,7 +73,9 @@ func TestOptionB_UserRoutes(t *testing.T) {
 
 	handler := user.NewHandler(&mockUserService{})
 	v1 := r.Group("/api/v1")
-	user.RegisterRoutes(v1, handler, dummyAuthMiddleware)
+	user.RegisterRoutes(v1, handler, dummyAuthMiddleware, dummyAdminMiddleware)
+
+	userID := uuid.New().String()
 
 	// 1. POST /api/v1/users is PUBLIC (registration succeeds without cookie)
 	body, _ := json.Marshal(map[string]string{
@@ -77,23 +88,59 @@ func TestOptionB_UserRoutes(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusCreated {
-		t.Fatalf("expected 201 Created for public registration, got %d (body: %s)", w.Code, w.Body.String())
+		t.Fatalf("expected 201 Created for public registration, got %d", w.Code)
 	}
 
-	// 2. GET /api/v1/users is PROTECTED (fails 401 without cookie)
-	req = httptest.NewRequest("GET", "/api/v1/users", nil)
+	// 2. GET /api/v1/users/:id requires authentication (fails 401 without cookie)
+	req = httptest.NewRequest("GET", "/api/v1/users/"+userID, nil)
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 Unauthorized for GET /users without cookie, got %d", w.Code)
+		t.Fatalf("expected 401 for GET /users/:id without cookie, got %d", w.Code)
 	}
 
-	// 3. GET /api/v1/users succeeds with valid cookie
-	req = httptest.NewRequest("GET", "/api/v1/users", nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "valid-cookie"})
+	// 3. GET /api/v1/users/:id succeeds for regular authenticated user
+	req = httptest.NewRequest("GET", "/api/v1/users/"+userID, nil)
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie"})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK for GET /users with cookie, got %d", w.Code)
+		t.Fatalf("expected 200 for GET /users/:id with regular user, got %d", w.Code)
+	}
+
+	// 4. GET /api/v1/users (list) is ADMIN-ONLY (fails 403 for regular user)
+	req = httptest.NewRequest("GET", "/api/v1/users", nil)
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie"})
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for regular user on GET /users, got %d", w.Code)
+	}
+
+	// 5. GET /api/v1/users (list) succeeds for admin
+	req = httptest.NewRequest("GET", "/api/v1/users", nil)
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "admin-cookie"})
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK for admin on GET /users, got %d", w.Code)
+	}
+
+	// 6. DELETE /api/v1/users/:id is ADMIN-ONLY (fails 403 for regular user)
+	req = httptest.NewRequest("DELETE", "/api/v1/users/"+userID, nil)
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie"})
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 Forbidden for regular user on DELETE /users/:id, got %d", w.Code)
+	}
+
+	// 7. DELETE /api/v1/users/:id succeeds for admin (204 No Content)
+	req = httptest.NewRequest("DELETE", "/api/v1/users/"+userID, nil)
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "admin-cookie"})
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 No Content for admin on DELETE /users/:id, got %d", w.Code)
 	}
 }

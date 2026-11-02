@@ -29,6 +29,7 @@ type User struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	AvatarUrl    *string   `json:"avatar_url"`
+	IsAdmin      bool      `json:"is_admin"`
 }
 
 type UserIdentity struct {
