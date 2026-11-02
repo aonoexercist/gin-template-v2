@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"gin-template-v2/internal/config"
+	"gin-template-v2/internal/features/auth"
 	"gin-template-v2/internal/features/health"
 	users "gin-template-v2/internal/features/user"
 	"gin-template-v2/internal/platform/httpx"
@@ -56,12 +57,22 @@ func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Eng
 	// Operational endpoints.
 	health.RegisterRoutes(r, health.NewHandler(pool))
 
+	// --- Auth & Identity Providers ---
+	providers := auth.NewProviderRegistry()
+	providers.Register("google", auth.NewGoogleVerifier(cfg.Auth.GoogleClientID))
+
+	authRepo := auth.NewRepository(pool)
+	authSvc := auth.NewService(authRepo, providers, cfg.Auth.SessionDuration)
+	authHandler := auth.NewHandler(authSvc, cfg.Auth)
+	authMiddleware := middleware.Authenticate(authSvc, cfg.Auth.CookieName)
+
 	// --- Dependency wiring (one block per feature) ---
 	usersHandler := users.NewHandler(users.NewService(users.NewRepository(pool)))
 
 	// --- API v1 ---
 	v1 := r.Group("/api/v1")
-	users.RegisterRoutes(v1, usersHandler)
+	auth.RegisterRoutes(v1, authHandler, authMiddleware)
+	users.RegisterRoutes(v1, usersHandler, authMiddleware)
 
 	return r
 }
