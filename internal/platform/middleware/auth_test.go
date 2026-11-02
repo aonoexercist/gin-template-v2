@@ -113,3 +113,58 @@ func TestAuthMiddleware(t *testing.T) {
 		t.Fatalf("expected 200 for valid cookie, got %d", w.Code)
 	}
 }
+
+func TestRequireAdminMiddleware(t *testing.T) {
+	regularUser := auth.User{
+		ID:      uuid.New(),
+		Email:   "regular@example.com",
+		IsAdmin: false,
+	}
+	adminUser := auth.User{
+		ID:      uuid.New(),
+		Email:   "admin@example.com",
+		IsAdmin: true,
+	}
+
+	r := gin.New()
+	r.GET("/admin-only", middleware.RequireAdmin(), func(c *gin.Context) {
+		c.String(http.StatusOK, "admin ok")
+	})
+
+	// Case 1: No user in context -> 401
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/admin-only", nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 without auth, got %d", w.Code)
+	}
+
+	// Case 2: Regular user -> 403 Forbidden
+	r2 := gin.New()
+	r2.Use(func(c *gin.Context) {
+		c.Set(middleware.ContextUserKey, regularUser)
+		c.Next()
+	})
+	r2.GET("/admin-only", middleware.RequireAdmin(), func(c *gin.Context) {
+		c.String(http.StatusOK, "admin ok")
+	})
+	w = httptest.NewRecorder()
+	r2.ServeHTTP(w, httptest.NewRequest("GET", "/admin-only", nil))
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for regular user, got %d", w.Code)
+	}
+
+	// Case 3: Admin user -> 200 OK
+	r3 := gin.New()
+	r3.Use(func(c *gin.Context) {
+		c.Set(middleware.ContextUserKey, adminUser)
+		c.Next()
+	})
+	r3.GET("/admin-only", middleware.RequireAdmin(), func(c *gin.Context) {
+		c.String(http.StatusOK, "admin ok")
+	})
+	w = httptest.NewRecorder()
+	r3.ServeHTTP(w, httptest.NewRequest("GET", "/admin-only", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for admin user, got %d", w.Code)
+	}
+}
