@@ -65,6 +65,7 @@ func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Eng
 	authSvc := auth.NewService(authRepo, providers, cfg.Auth.SessionDuration)
 	authHandler := auth.NewHandler(authSvc, cfg.Auth)
 	authMiddleware := middleware.Authenticate(authSvc, cfg.Auth.CookieName)
+	adminMiddleware := middleware.RequireAdmin()
 
 	// --- Dependency wiring (one block per feature) ---
 	usersHandler := users.NewHandler(users.NewService(users.NewRepository(pool)))
@@ -72,7 +73,7 @@ func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Eng
 	// --- API v1 ---
 	v1 := r.Group("/api/v1")
 	auth.RegisterRoutes(v1, authHandler, authMiddleware)
-	users.RegisterRoutes(v1, usersHandler, authMiddleware)
+	users.RegisterRoutes(v1, usersHandler, authMiddleware, adminMiddleware)
 
 	return r
 }
