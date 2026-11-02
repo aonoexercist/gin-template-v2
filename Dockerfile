@@ -4,7 +4,7 @@
 #   docker build -t myapp .                      # runtime image (default, last stage)
 #   docker build --target migrate -t myapp-migrate .   # goose + migrations
 
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 
 # ---------- build ----------
 FROM docker.io/library/golang:${GO_VERSION}-alpine AS build
