@@ -10,11 +10,32 @@ import (
 	"github.com/google/uuid"
 )
 
+type Session struct {
+	ID           uuid.UUID `json:"id"`
+	UserID       uuid.UUID `json:"user_id"`
+	TokenHash    string    `json:"token_hash"`
+	UserAgent    *string   `json:"user_agent"`
+	IpAddress    *string   `json:"ip_address"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedAt    time.Time `json:"created_at"`
+	LastActiveAt time.Time `json:"last_active_at"`
+}
+
 type User struct {
 	ID           uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
 	Name         string    `json:"name"`
-	PasswordHash string    `json:"password_hash"`
+	PasswordHash *string   `json:"password_hash"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	AvatarUrl    *string   `json:"avatar_url"`
+}
+
+type UserIdentity struct {
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
