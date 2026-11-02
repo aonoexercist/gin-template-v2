@@ -42,8 +42,12 @@ func (h *Handler) fail(c *gin.Context, err error) {
 	}
 }
 
-func toUser(u userdb.User) User {
-	return User{ID: u.ID, Email: u.Email, Name: u.Name, PasswordHash: u.PasswordHash, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
+func toUser(u userdb.CreateUserRow) User {
+	pw := ""
+	if u.PasswordHash != nil {
+		pw = *u.PasswordHash
+	}
+	return User{ID: u.ID, Email: u.Email, Name: u.Name, PasswordHash: pw, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
 type userRow interface {
