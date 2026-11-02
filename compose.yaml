@@ -55,5 +55,16 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8088}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   pgdata:
