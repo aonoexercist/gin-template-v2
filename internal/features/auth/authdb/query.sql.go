@@ -54,7 +54,7 @@ func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) 
 const createOAuthUser = `-- name: CreateOAuthUser :one
 INSERT INTO users (email, name, avatar_url)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, avatar_url, created_at, updated_at
+RETURNING id, email, name, avatar_url, is_admin, created_at, updated_at
 `
 
 type CreateOAuthUserParams struct {
@@ -68,6 +68,7 @@ type CreateOAuthUserRow struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	AvatarUrl *string   `json:"avatar_url"`
+	IsAdmin   bool      `json:"is_admin"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -80,6 +81,7 @@ func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams
 		&i.Email,
 		&i.Name,
 		&i.AvatarUrl,
+		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -198,6 +200,7 @@ SELECT
     u.email,
     u.name,
     u.avatar_url,
+    u.is_admin,
     u.created_at AS user_created_at,
     u.updated_at AS user_updated_at
 FROM sessions s
@@ -218,6 +221,7 @@ type GetSessionAndUserByTokenHashRow struct {
 	Email            string    `json:"email"`
 	Name             string    `json:"name"`
 	AvatarUrl        *string   `json:"avatar_url"`
+	IsAdmin          bool      `json:"is_admin"`
 	UserCreatedAt    time.Time `json:"user_created_at"`
 	UserUpdatedAt    time.Time `json:"user_updated_at"`
 }
@@ -238,6 +242,7 @@ func (q *Queries) GetSessionAndUserByTokenHash(ctx context.Context, tokenHash st
 		&i.Email,
 		&i.Name,
 		&i.AvatarUrl,
+		&i.IsAdmin,
 		&i.UserCreatedAt,
 		&i.UserUpdatedAt,
 	)
@@ -245,7 +250,7 @@ func (q *Queries) GetSessionAndUserByTokenHash(ctx context.Context, tokenHash st
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, avatar_url, created_at, updated_at
+SELECT id, email, name, avatar_url, is_admin, created_at, updated_at
 FROM users
 WHERE email = $1
 `
@@ -255,6 +260,7 @@ type GetUserByEmailRow struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	AvatarUrl *string   `json:"avatar_url"`
+	IsAdmin   bool      `json:"is_admin"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -267,6 +273,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 		&i.Email,
 		&i.Name,
 		&i.AvatarUrl,
+		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -274,7 +281,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 }
 
 const getUserByIdentity = `-- name: GetUserByIdentity :one
-SELECT u.id, u.email, u.name, u.avatar_url, u.created_at, u.updated_at
+SELECT u.id, u.email, u.name, u.avatar_url, u.is_admin, u.created_at, u.updated_at
 FROM users u
 JOIN user_identities ui ON ui.user_id = u.id
 WHERE ui.provider = $1 AND ui.provider_user_id = $2
@@ -290,6 +297,7 @@ type GetUserByIdentityRow struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	AvatarUrl *string   `json:"avatar_url"`
+	IsAdmin   bool      `json:"is_admin"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -302,6 +310,7 @@ func (q *Queries) GetUserByIdentity(ctx context.Context, arg GetUserByIdentityPa
 		&i.Email,
 		&i.Name,
 		&i.AvatarUrl,
+		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -309,7 +318,7 @@ func (q *Queries) GetUserByIdentity(ctx context.Context, arg GetUserByIdentityPa
 }
 
 const getUserWithPasswordByEmail = `-- name: GetUserWithPasswordByEmail :one
-SELECT id, email, name, password_hash, avatar_url, created_at, updated_at
+SELECT id, email, name, password_hash, avatar_url, is_admin, created_at, updated_at
 FROM users
 WHERE email = $1
 `
@@ -320,6 +329,7 @@ type GetUserWithPasswordByEmailRow struct {
 	Name         string    `json:"name"`
 	PasswordHash *string   `json:"password_hash"`
 	AvatarUrl    *string   `json:"avatar_url"`
+	IsAdmin      bool      `json:"is_admin"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -333,6 +343,7 @@ func (q *Queries) GetUserWithPasswordByEmail(ctx context.Context, email string) 
 		&i.Name,
 		&i.PasswordHash,
 		&i.AvatarUrl,
+		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -392,7 +403,7 @@ SET avatar_url = COALESCE($1, avatar_url),
     name = COALESCE($2, name),
     updated_at = now()
 WHERE id = $3
-RETURNING id, email, name, avatar_url, created_at, updated_at
+RETURNING id, email, name, avatar_url, is_admin, created_at, updated_at
 `
 
 type UpdateUserAvatarAndNameParams struct {
@@ -406,6 +417,7 @@ type UpdateUserAvatarAndNameRow struct {
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	AvatarUrl *string   `json:"avatar_url"`
+	IsAdmin   bool      `json:"is_admin"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -418,6 +430,7 @@ func (q *Queries) UpdateUserAvatarAndName(ctx context.Context, arg UpdateUserAva
 		&i.Email,
 		&i.Name,
 		&i.AvatarUrl,
+		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

@@ -55,6 +55,7 @@ func toUserFromRow[T userRowType](r T) User {
 		Email:     u.Email,
 		Name:      u.Name,
 		AvatarURL: u.AvatarUrl,
+		IsAdmin:   u.IsAdmin,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}

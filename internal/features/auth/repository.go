@@ -130,6 +130,7 @@ func (r *pgRepository) GetUserWithPasswordByEmail(ctx context.Context, email str
 		Email:     row.Email,
 		Name:      row.Name,
 		AvatarURL: row.AvatarUrl,
+		IsAdmin:   row.IsAdmin,
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 	}
@@ -172,6 +173,7 @@ func (r *pgRepository) GetSessionAndUserByTokenHash(ctx context.Context, tokenHa
 		Email:     row.Email,
 		Name:      row.Name,
 		AvatarURL: row.AvatarUrl,
+		IsAdmin:   row.IsAdmin,
 		CreatedAt: row.UserCreatedAt,
 		UpdatedAt: row.UserUpdatedAt,
 	}
