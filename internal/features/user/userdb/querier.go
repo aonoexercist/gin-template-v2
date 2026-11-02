@@ -12,7 +12,7 @@ import (
 
 type Querier interface {
 	CountUsers(ctx context.Context) (int64, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) (int64, error)
 	GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error)
