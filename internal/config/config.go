@@ -22,6 +22,7 @@ type Config struct {
 	Log  LogConfig
 	DB   DBConfig
 	CORS CORSConfig
+	Auth AuthConfig
 }
 
 type HTTPConfig struct {
@@ -50,6 +51,15 @@ type DBConfig struct {
 
 type CORSConfig struct {
 	AllowedOrigins []string
+}
+
+type AuthConfig struct {
+	GoogleClientID  string
+	CookieName      string
+	CookieDomain    string
+	CookieSecure    bool
+	CookieSameSite  string // "lax", "strict", "none"
+	SessionDuration time.Duration
 }
 
 func (c Config) IsProduction() bool { return c.Env == EnvProduction }
@@ -88,6 +98,14 @@ func Load() (Config, error) {
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: l.list("CORS_ALLOWED_ORIGINS"),
+		},
+		Auth: AuthConfig{
+			GoogleClientID:  l.str("GOOGLE_CLIENT_ID", ""),
+			CookieName:      l.str("AUTH_COOKIE_NAME", "sid"),
+			CookieDomain:    l.str("AUTH_COOKIE_DOMAIN", ""),
+			CookieSecure:    l.bool("AUTH_COOKIE_SECURE", env == EnvProduction),
+			CookieSameSite:  strings.ToLower(l.str("AUTH_COOKIE_SAME_SITE", "lax")),
+			SessionDuration: l.dur("AUTH_SESSION_DURATION", 7*24*time.Hour),
 		},
 	}
 
@@ -132,6 +150,19 @@ func (l *loader) int(key string, def int) int {
 		return def
 	}
 	return n
+}
+
+func (l *loader) bool(key string, def bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		l.errs = append(l.errs, fmt.Errorf("%s: invalid boolean %q", key, v))
+		return def
+	}
+	return b
 }
 
 func (l *loader) dur(key string, def time.Duration) time.Duration {
