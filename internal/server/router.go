@@ -25,7 +25,7 @@ import (
 // To add a feature: build its repo/service/handler below and mount it on a version group.
 // To add a breaking API version: create `v2 := r.Group("/api/v2")` and mount only the
 // features that changed; v1 keeps serving existing clients untouched.
-func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Engine {
+func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool, authRepo auth.Repository) *gin.Engine {
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -61,7 +61,6 @@ func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Eng
 	providers := auth.NewProviderRegistry()
 	providers.Register("google", auth.NewGoogleVerifier(cfg.Auth.GoogleClientID))
 
-	authRepo := auth.NewRepository(pool)
 	authSvc := auth.NewService(authRepo, providers, cfg.Auth.SessionDuration)
 	authHandler := auth.NewHandler(authSvc, cfg.Auth)
 	authMiddleware := middleware.Authenticate(authSvc, cfg.Auth.CookieName)

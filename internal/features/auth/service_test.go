@@ -138,6 +138,18 @@ func (m *mockRepo) ListActiveSessions(ctx context.Context, userID uuid.UUID, cur
 	return out, nil
 }
 
+func (m *mockRepo) CleanExpiredSessions(ctx context.Context) (int64, error) {
+	var count int64
+	now := time.Now()
+	for k, s := range m.sessions {
+		if !s.ExpiresAt.After(now) {
+			delete(m.sessions, k)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func TestMultiDeviceSessions(t *testing.T) {
 	repo := newMockRepo()
 	reg := auth.NewProviderRegistry()

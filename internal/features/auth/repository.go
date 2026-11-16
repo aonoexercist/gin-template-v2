@@ -24,6 +24,7 @@ type Repository interface {
 	DeleteOtherSessions(ctx context.Context, userID uuid.UUID, currentTokenHash string) error
 	DeleteAllSessions(ctx context.Context, userID uuid.UUID) error
 	ListActiveSessions(ctx context.Context, userID uuid.UUID, currentTokenHash string) ([]Session, error)
+	CleanExpiredSessions(ctx context.Context) (int64, error)
 }
 
 type pgRepository struct {
@@ -227,4 +228,8 @@ func (r *pgRepository) ListActiveSessions(ctx context.Context, userID uuid.UUID,
 		out[i] = listSessionRowToSession(row, currentTokenHash)
 	}
 	return out, nil
+}
+
+func (r *pgRepository) CleanExpiredSessions(ctx context.Context) (int64, error) {
+	return r.q.CleanExpiredSessions(ctx)
 }
