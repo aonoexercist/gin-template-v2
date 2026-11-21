@@ -2,13 +2,17 @@ package user
 
 import (
 	"context"
+	"errors"
 	"strings"
 
+	"gin-template-v2/internal/platform/dbgen"
+
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Service holds the feature's business rules.
 type Service interface {
 	Create(ctx context.Context, email, name string, password string) (User, error)
 	Get(ctx context.Context, id uuid.UUID) (User, error)
@@ -17,9 +21,12 @@ type Service interface {
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
-type service struct{ repo Repository }
+// service talks to sqlc's generated Querier directly. Querier is already an
+// interface, so it can be mocked in tests; a separate Repository layer would
+// only forward calls. Use q.WithTx(tx) when you need a transaction.
+type service struct{ q dbgen.Querier }
 
-func NewService(repo Repository) Service { return &service{repo: repo} }
+func NewService(q dbgen.Querier) Service { return &service{q: q} }
 
 func (s *service) Create(ctx context.Context, email, name string, password string) (User, error) {
 	email, name = normalizeEmail(email), strings.TrimSpace(name)
@@ -31,11 +38,31 @@ func (s *service) Create(ctx context.Context, email, name string, password strin
 	if err != nil {
 		return User{}, err
 	}
-	return s.repo.Create(ctx, email, name, string(hash))
+	hashStr := string(hash)
+
+	user, err := s.q.CreateUser(ctx, dbgen.CreateUserParams{
+		Email:        email,
+		Name:         name,
+		PasswordHash: &hashStr,
+	})
+	if err != nil {
+		if isUniqueViolation(err) {
+			return User{}, ErrEmailTaken
+		}
+		return User{}, err
+	}
+	return user, nil
 }
 
 func (s *service) Get(ctx context.Context, id uuid.UUID) (User, error) {
-	return s.repo.Get(ctx, id)
+	user, err := s.q.GetUser(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrNotFound
+		}
+		return User{}, err
+	}
+	return user, nil
 }
 
 func (s *service) List(ctx context.Context, page, perPage int) ([]User, int64, error) {
@@ -49,14 +76,19 @@ func (s *service) List(ctx context.Context, page, perPage int) ([]User, int64, e
 		perPage = 100
 	}
 
-	items, err := s.repo.List(ctx, int32(perPage), int32((page-1)*perPage))
+	items, err := s.q.ListUsers(ctx, dbgen.ListUsersParams{
+		PageLimit:  int32(perPage),
+		PageOffset: int32((page - 1) * perPage),
+	})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.repo.Count(ctx)
+
+	total, err := s.q.CountUsers(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
+
 	return items, total, nil
 }
 
@@ -78,9 +110,39 @@ func (s *service) Update(ctx context.Context, id uuid.UUID, email, name *string)
 		}
 		name = &n
 	}
-	return s.repo.Update(ctx, id, email, name)
+
+	user, err := s.q.UpdateUser(ctx, dbgen.UpdateUserParams{
+		ID:    id,
+		Email: email,
+		Name:  name,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, ErrNotFound
+		}
+		if isUniqueViolation(err) {
+			return User{}, ErrEmailTaken
+		}
+		return User{}, err
+	}
+	return user, nil
 }
 
 func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
-	return s.repo.Delete(ctx, id)
+	n, err := s.q.DeleteUser(ctx, id)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
+
+// Candidate to move into a shared platform/dbx package once a second feature needs it.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func normalizeEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }

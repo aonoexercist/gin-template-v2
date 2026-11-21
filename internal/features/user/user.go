@@ -1,10 +1,25 @@
 package user
 
 import (
+	"errors"
 	"time"
+
+	"gin-template-v2/internal/platform/dbgen"
 
 	"github.com/google/uuid"
 )
+
+// User is the sqlc row type. No hand-written copy, no mapper to keep
+// in sync: add a column in the migration + query.sql and it appears here.
+type User = dbgen.User
+
+var (
+	ErrNotFound     = errors.New("user not found")
+	ErrEmailTaken   = errors.New("email already in use")
+	ErrInvalidInput = errors.New("invalid input")
+)
+
+// ---- HTTP DTOs ----
 
 type CreateUserRequest struct {
 	Email    string `json:"email" binding:"required,email,max=254"`
@@ -34,5 +49,12 @@ type UserResponse struct {
 }
 
 func newUserResponse(u User) UserResponse {
-	return UserResponse{ID: u.ID, Email: u.Email, Name: u.Name, IsAdmin: u.IsAdmin, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
+	return UserResponse{
+		ID:        u.ID,
+		Email:     u.Email,
+		Name:      u.Name,
+		IsAdmin:   u.IsAdmin,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+	}
 }
