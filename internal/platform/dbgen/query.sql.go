@@ -76,7 +76,7 @@ func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) 
 const createOAuthUser = `-- name: CreateOAuthUser :one
 INSERT INTO users (email, name, avatar_url)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, avatar_url, is_admin, created_at, updated_at
+RETURNING id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 `
 
 type CreateOAuthUserParams struct {
@@ -85,27 +85,18 @@ type CreateOAuthUserParams struct {
 	AvatarUrl *string `json:"avatar_url"`
 }
 
-type CreateOAuthUserRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	AvatarUrl *string   `json:"avatar_url"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams) (CreateOAuthUserRow, error) {
+func (q *Queries) CreateOAuthUser(ctx context.Context, arg CreateOAuthUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createOAuthUser, arg.Email, arg.Name, arg.AvatarUrl)
-	var i CreateOAuthUserRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
-		&i.AvatarUrl,
-		&i.IsAdmin,
+		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -167,7 +158,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, name, password_hash)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, password_hash, is_admin, created_at, updated_at
+RETURNING id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 `
 
 type CreateUserParams struct {
@@ -176,27 +167,18 @@ type CreateUserParams struct {
 	PasswordHash *string `json:"password_hash"`
 }
 
-type CreateUserRow struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	Name         string    `json:"name"`
-	PasswordHash *string   `json:"password_hash"`
-	IsAdmin      bool      `json:"is_admin"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Name, arg.PasswordHash)
-	var i CreateUserRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
 		&i.PasswordHash,
-		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -369,67 +351,51 @@ func (q *Queries) GetSessionAndUserByTokenHash(ctx context.Context, tokenHash st
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, email, name, is_admin, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 FROM users
 WHERE id = $1
 `
 
-type GetUserRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (GetUserRow, error) {
+func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, getUser, id)
-	var i GetUserRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
-		&i.IsAdmin,
+		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, name, avatar_url, is_admin, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 FROM users
 WHERE email = $1
 `
 
-type GetUserByEmailRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	AvatarUrl *string   `json:"avatar_url"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error) {
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByEmail, email)
-	var i GetUserByEmailRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
-		&i.AvatarUrl,
-		&i.IsAdmin,
+		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
 
 const getUserByIdentity = `-- name: GetUserByIdentity :one
-SELECT u.id, u.email, u.name, u.avatar_url, u.is_admin, u.created_at, u.updated_at
+SELECT u.id, u.email, u.name, u.password_hash, u.created_at, u.updated_at, u.avatar_url, u.is_admin
 FROM users u
 JOIN user_identities ui ON ui.user_id = u.id
 WHERE ui.provider = $1 AND ui.provider_user_id = $2
@@ -440,60 +406,40 @@ type GetUserByIdentityParams struct {
 	ProviderUserID string `json:"provider_user_id"`
 }
 
-type GetUserByIdentityRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	AvatarUrl *string   `json:"avatar_url"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) GetUserByIdentity(ctx context.Context, arg GetUserByIdentityParams) (GetUserByIdentityRow, error) {
+func (q *Queries) GetUserByIdentity(ctx context.Context, arg GetUserByIdentityParams) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByIdentity, arg.Provider, arg.ProviderUserID)
-	var i GetUserByIdentityRow
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.Name,
-		&i.AvatarUrl,
-		&i.IsAdmin,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getUserWithPasswordByEmail = `-- name: GetUserWithPasswordByEmail :one
-SELECT id, email, name, password_hash, avatar_url, is_admin, created_at, updated_at
-FROM users
-WHERE email = $1
-`
-
-type GetUserWithPasswordByEmailRow struct {
-	ID           uuid.UUID `json:"id"`
-	Email        string    `json:"email"`
-	Name         string    `json:"name"`
-	PasswordHash *string   `json:"password_hash"`
-	AvatarUrl    *string   `json:"avatar_url"`
-	IsAdmin      bool      `json:"is_admin"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-}
-
-func (q *Queries) GetUserWithPasswordByEmail(ctx context.Context, email string) (GetUserWithPasswordByEmailRow, error) {
-	row := q.db.QueryRow(ctx, getUserWithPasswordByEmail, email)
-	var i GetUserWithPasswordByEmailRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
 		&i.PasswordHash,
-		&i.AvatarUrl,
-		&i.IsAdmin,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
+	)
+	return i, err
+}
+
+const getUserWithPasswordByEmail = `-- name: GetUserWithPasswordByEmail :one
+SELECT id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
+FROM users
+WHERE email = $1
+`
+
+func (q *Queries) GetUserWithPasswordByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserWithPasswordByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -572,7 +518,7 @@ func (q *Queries) ListOrganizations(ctx context.Context, arg ListOrganizationsPa
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, email, name, is_admin, created_at, updated_at
+SELECT id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 FROM users
 ORDER BY created_at DESC, id
 LIMIT $2 OFFSET $1
@@ -583,31 +529,24 @@ type ListUsersParams struct {
 	PageLimit  int32 `json:"page_limit"`
 }
 
-type ListUsersRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
+func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error) {
 	rows, err := q.db.Query(ctx, listUsers, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListUsersRow{}
+	items := []User{}
 	for rows.Next() {
-		var i ListUsersRow
+		var i User
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,
 			&i.Name,
-			&i.IsAdmin,
+			&i.PasswordHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AvatarUrl,
+			&i.IsAdmin,
 		); err != nil {
 			return nil, err
 		}
@@ -661,7 +600,7 @@ SET name       = COALESCE($1, name),
     email      = COALESCE($2, email),
     updated_at = now()
 WHERE id = $3
-RETURNING id, email, name, is_admin, created_at, updated_at
+RETURNING id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 `
 
 type UpdateUserParams struct {
@@ -670,25 +609,18 @@ type UpdateUserParams struct {
 	ID    uuid.UUID `json:"id"`
 }
 
-type UpdateUserRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUser, arg.Name, arg.Email, arg.ID)
-	var i UpdateUserRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
-		&i.IsAdmin,
+		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
@@ -699,7 +631,7 @@ SET avatar_url = COALESCE($1, avatar_url),
     name = COALESCE($2, name),
     updated_at = now()
 WHERE id = $3
-RETURNING id, email, name, avatar_url, is_admin, created_at, updated_at
+RETURNING id, email, name, password_hash, created_at, updated_at, avatar_url, is_admin
 `
 
 type UpdateUserAvatarAndNameParams struct {
@@ -708,27 +640,18 @@ type UpdateUserAvatarAndNameParams struct {
 	ID        uuid.UUID `json:"id"`
 }
 
-type UpdateUserAvatarAndNameRow struct {
-	ID        uuid.UUID `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	AvatarUrl *string   `json:"avatar_url"`
-	IsAdmin   bool      `json:"is_admin"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) UpdateUserAvatarAndName(ctx context.Context, arg UpdateUserAvatarAndNameParams) (UpdateUserAvatarAndNameRow, error) {
+func (q *Queries) UpdateUserAvatarAndName(ctx context.Context, arg UpdateUserAvatarAndNameParams) (User, error) {
 	row := q.db.QueryRow(ctx, updateUserAvatarAndName, arg.AvatarUrl, arg.Name, arg.ID)
-	var i UpdateUserAvatarAndNameRow
+	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.Name,
-		&i.AvatarUrl,
-		&i.IsAdmin,
+		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AvatarUrl,
+		&i.IsAdmin,
 	)
 	return i, err
 }
