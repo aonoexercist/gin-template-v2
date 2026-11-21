@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"gin-template-v2/internal/features/auth/authdb"
+	"gin-template-v2/internal/platform/dbgen"
 	"gin-template-v2/internal/platform/httpx"
 	"gin-template-v2/internal/platform/logger"
 )
@@ -45,11 +45,11 @@ func (h *Handler) fail(c *gin.Context, err error) {
 }
 
 type userRowType interface {
-	authdb.GetUserByIdentityRow | authdb.GetUserByEmailRow | authdb.CreateOAuthUserRow | authdb.UpdateUserAvatarAndNameRow
+	dbgen.GetUserByIdentityRow | dbgen.GetUserByEmailRow | dbgen.CreateOAuthUserRow | dbgen.UpdateUserAvatarAndNameRow
 }
 
 func toUserFromRow[T userRowType](r T) User {
-	u := authdb.GetUserByIdentityRow(r)
+	u := dbgen.GetUserByIdentityRow(r)
 	return User{
 		ID:        u.ID,
 		Email:     u.Email,
@@ -61,7 +61,7 @@ func toUserFromRow[T userRowType](r T) User {
 	}
 }
 
-func sessionRowToSession(s authdb.Session) Session {
+func sessionRowToSession(s dbgen.Session) Session {
 	return Session{
 		ID:           s.ID,
 		UserID:       s.UserID,
@@ -74,7 +74,7 @@ func sessionRowToSession(s authdb.Session) Session {
 	}
 }
 
-func listSessionRowToSession(s authdb.Session, currentTokenHash string) Session {
+func listSessionRowToSession(s dbgen.Session, currentTokenHash string) Session {
 	return Session{
 		ID:           s.ID,
 		UserID:       s.UserID,

@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"gin-template-v2/internal/features/auth/authdb"
+	"gin-template-v2/internal/platform/dbgen"
 )
 
 // Repository defines the persistence operations for authentication and sessions.
@@ -29,27 +29,27 @@ type Repository interface {
 
 type pgRepository struct {
 	pool *pgxpool.Pool
-	q    *authdb.Queries
+	q    *dbgen.Queries
 }
 
 // NewRepository returns a Postgres-backed Repository.
 func NewRepository(pool *pgxpool.Pool) Repository {
 	return &pgRepository{
 		pool: pool,
-		q:    authdb.New(pool),
+		q:    dbgen.New(pool),
 	}
 }
 
 func (r *pgRepository) FindOrCreateUserByIdentity(ctx context.Context, profile *OAuthProfile) (User, error) {
 	// 1. Try to find user by linked identity
-	row, err := r.q.GetUserByIdentity(ctx, authdb.GetUserByIdentityParams{
+	row, err := r.q.GetUserByIdentity(ctx, dbgen.GetUserByIdentityParams{
 		Provider:       profile.Provider,
 		ProviderUserID: profile.ProviderUserID,
 	})
 	if err == nil {
 		// Update avatar or name if profile has newer info
 		if profile.AvatarURL != nil || profile.Name != "" {
-			updated, updateErr := r.q.UpdateUserAvatarAndName(ctx, authdb.UpdateUserAvatarAndNameParams{
+			updated, updateErr := r.q.UpdateUserAvatarAndName(ctx, dbgen.UpdateUserAvatarAndNameParams{
 				ID:        row.ID,
 				AvatarUrl: profile.AvatarURL,
 				Name:      &profile.Name,
@@ -77,7 +77,7 @@ func (r *pgRepository) FindOrCreateUserByIdentity(ctx context.Context, profile *
 	existingUser, err := qtx.GetUserByEmail(ctx, profile.Email)
 	if err == nil {
 		// Link identity to existing user
-		_, err = qtx.CreateIdentity(ctx, authdb.CreateIdentityParams{
+		_, err = qtx.CreateIdentity(ctx, dbgen.CreateIdentityParams{
 			UserID:         existingUser.ID,
 			Provider:       profile.Provider,
 			ProviderUserID: profile.ProviderUserID,
@@ -95,7 +95,7 @@ func (r *pgRepository) FindOrCreateUserByIdentity(ctx context.Context, profile *
 	}
 
 	// User does not exist, create new user
-	newUser, err := qtx.CreateOAuthUser(ctx, authdb.CreateOAuthUserParams{
+	newUser, err := qtx.CreateOAuthUser(ctx, dbgen.CreateOAuthUserParams{
 		Email:     profile.Email,
 		Name:      profile.Name,
 		AvatarUrl: profile.AvatarURL,
@@ -105,7 +105,7 @@ func (r *pgRepository) FindOrCreateUserByIdentity(ctx context.Context, profile *
 	}
 
 	// Create identity
-	_, err = qtx.CreateIdentity(ctx, authdb.CreateIdentityParams{
+	_, err = qtx.CreateIdentity(ctx, dbgen.CreateIdentityParams{
 		UserID:         newUser.ID,
 		Provider:       profile.Provider,
 		ProviderUserID: profile.ProviderUserID,
@@ -139,7 +139,7 @@ func (r *pgRepository) GetUserWithPasswordByEmail(ctx context.Context, email str
 }
 
 func (r *pgRepository) CreateSession(ctx context.Context, userID uuid.UUID, tokenHash string, userAgent, ipAddress *string, expiresAt time.Time) (Session, error) {
-	row, err := r.q.CreateSession(ctx, authdb.CreateSessionParams{
+	row, err := r.q.CreateSession(ctx, dbgen.CreateSessionParams{
 		UserID:    userID,
 		TokenHash: tokenHash,
 		UserAgent: userAgent,
@@ -192,7 +192,7 @@ func (r *pgRepository) DeleteSessionByTokenHash(ctx context.Context, tokenHash s
 }
 
 func (r *pgRepository) DeleteSessionByID(ctx context.Context, sessionID, userID uuid.UUID) error {
-	n, err := r.q.DeleteSessionByID(ctx, authdb.DeleteSessionByIDParams{
+	n, err := r.q.DeleteSessionByID(ctx, dbgen.DeleteSessionByIDParams{
 		ID:     sessionID,
 		UserID: userID,
 	})
@@ -206,7 +206,7 @@ func (r *pgRepository) DeleteSessionByID(ctx context.Context, sessionID, userID 
 }
 
 func (r *pgRepository) DeleteOtherSessions(ctx context.Context, userID uuid.UUID, currentTokenHash string) error {
-	_, err := r.q.DeleteOtherSessionsForUser(ctx, authdb.DeleteOtherSessionsForUserParams{
+	_, err := r.q.DeleteOtherSessionsForUser(ctx, dbgen.DeleteOtherSessionsForUserParams{
 		UserID:    userID,
 		TokenHash: currentTokenHash,
 	})
