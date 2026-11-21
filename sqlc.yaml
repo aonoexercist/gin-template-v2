@@ -1,5 +1,5 @@
 version: "2"
-# One entry per feature: each feature owns its queries and its generated package.
+# One shared generated package. Each feature still owns its own query.sql.
 # sqlc reads the goose migrations as the schema (the "-- +goose Down" parts are ignored).
 overrides:
   go:
@@ -10,27 +10,17 @@ overrides:
         go_type: time.Time
 
 sql:
-  - name: users
+  - name: app
     engine: postgresql
     schema: db/migrations
-    queries: internal/features/user/query.sql
+    queries:
+      - internal/features/user/query.sql
+      - internal/features/auth/query.sql
+      - internal/features/organization/query.sql
     gen:
       go:
-        package: userdb
-        out: internal/features/user/userdb
-        sql_package: pgx/v5
-        emit_json_tags: true
-        emit_interface: true
-        emit_empty_slices: true
-        emit_pointers_for_null_types: true
-  - name: auth
-    engine: postgresql
-    schema: db/migrations
-    queries: internal/features/auth/query.sql
-    gen:
-      go:
-        package: authdb
-        out: internal/features/auth/authdb
+        package: dbgen
+        out: internal/platform/dbgen
         sql_package: pgx/v5
         emit_json_tags: true
         emit_interface: true
