@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"gin-template-v2/internal/features/user/userdb"
+	"gin-template-v2/internal/platform/dbgen"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -42,7 +42,7 @@ func (h *Handler) fail(c *gin.Context, err error) {
 	}
 }
 
-func toUser(u userdb.CreateUserRow) User {
+func toUser(u dbgen.CreateUserRow) User {
 	pw := ""
 	if u.PasswordHash != nil {
 		pw = *u.PasswordHash
@@ -51,11 +51,11 @@ func toUser(u userdb.CreateUserRow) User {
 }
 
 type userRow interface {
-	userdb.GetUserRow | userdb.ListUsersRow | userdb.UpdateUserRow
+	dbgen.GetUserRow | dbgen.ListUsersRow | dbgen.UpdateUserRow
 }
 
 func rowToUser[T userRow](r T) User {
-	u := userdb.GetUserRow(r)
+	u := dbgen.GetUserRow(r)
 	return User{ID: u.ID, Email: u.Email, Name: u.Name, IsAdmin: u.IsAdmin, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt}
 }
 
