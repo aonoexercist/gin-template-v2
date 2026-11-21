@@ -6,11 +6,16 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+
+	"gin-template-v2/internal/platform/dbgen"
 )
 
 // Service encapsulates authentication and session management logic.
@@ -25,22 +30,115 @@ type Service interface {
 	ListSessions(ctx context.Context, userID uuid.UUID, rawToken string) ([]Session, error)
 }
 
+// service talks to sqlc's generated Querier directly. Querier is already an
+// interface, so it can be mocked in tests; a separate Repository layer would
+// only forward calls. Use pool.Begin(ctx) / q.WithTx(tx) when you need a transaction.
 type service struct {
-	repo            Repository
+	q               dbgen.Querier
+	pool            *pgxpool.Pool
 	providers       *ProviderRegistry
 	sessionDuration time.Duration
 }
 
 // NewService constructs an auth Service.
-func NewService(repo Repository, providers *ProviderRegistry, sessionDuration time.Duration) Service {
+func NewService(q dbgen.Querier, pool *pgxpool.Pool, providers *ProviderRegistry, sessionDuration time.Duration) Service {
 	if sessionDuration <= 0 {
 		sessionDuration = 7 * 24 * time.Hour
 	}
 	return &service{
-		repo:            repo,
+		q:               q,
+		pool:            pool,
 		providers:       providers,
 		sessionDuration: sessionDuration,
 	}
+}
+
+func (s *service) findOrCreateUserByIdentity(ctx context.Context, profile *OAuthProfile) (User, error) {
+	// 1. Try to find user by linked identity
+	row, err := s.q.GetUserByIdentity(ctx, dbgen.GetUserByIdentityParams{
+		Provider:       profile.Provider,
+		ProviderUserID: profile.ProviderUserID,
+	})
+	if err == nil {
+		// Update avatar or name if profile has newer info
+		if profile.AvatarURL != nil || profile.Name != "" {
+			updated, updateErr := s.q.UpdateUserAvatarAndName(ctx, dbgen.UpdateUserAvatarAndNameParams{
+				ID:        row.ID,
+				AvatarUrl: profile.AvatarURL,
+				Name:      &profile.Name,
+			})
+			if updateErr == nil {
+				return updated, nil
+			}
+		}
+		return row, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return User{}, err
+	}
+
+	// 2. Identity not found: link to existing user or create user + identity
+	var qtx dbgen.Querier = s.q
+	var tx pgx.Tx
+	if s.pool != nil {
+		var txErr error
+		tx, txErr = s.pool.Begin(ctx)
+		if txErr != nil {
+			return User{}, txErr
+		}
+		defer tx.Rollback(ctx)
+		qtx = dbgen.New(tx)
+	}
+
+	// Check if user with this email already exists
+	existingUser, err := qtx.GetUserByEmail(ctx, profile.Email)
+	if err == nil {
+		_, err = qtx.CreateIdentity(ctx, dbgen.CreateIdentityParams{
+			UserID:         existingUser.ID,
+			Provider:       profile.Provider,
+			ProviderUserID: profile.ProviderUserID,
+		})
+		if err != nil {
+			return User{}, err
+		}
+		if tx != nil {
+			if err := tx.Commit(ctx); err != nil {
+				return User{}, err
+			}
+		}
+		return existingUser, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return User{}, err
+	}
+
+	// User does not exist, create new user
+	newUser, err := qtx.CreateOAuthUser(ctx, dbgen.CreateOAuthUserParams{
+		Email:     profile.Email,
+		Name:      profile.Name,
+		AvatarUrl: profile.AvatarURL,
+	})
+	if err != nil {
+		return User{}, err
+	}
+
+	// Create identity
+	_, err = qtx.CreateIdentity(ctx, dbgen.CreateIdentityParams{
+		UserID:         newUser.ID,
+		Provider:       profile.Provider,
+		ProviderUserID: profile.ProviderUserID,
+	})
+	if err != nil {
+		return User{}, err
+	}
+
+	if tx != nil {
+		if err := tx.Commit(ctx); err != nil {
+			return User{}, err
+		}
+	}
+
+	return newUser, nil
 }
 
 func (s *service) LoginWithProvider(ctx context.Context, provider string, token string, clientInfo ClientInfo) (string, Session, User, error) {
@@ -54,7 +152,7 @@ func (s *service) LoginWithProvider(ctx context.Context, provider string, token 
 		return "", Session{}, User{}, err
 	}
 
-	user, err := s.repo.FindOrCreateUserByIdentity(ctx, profile)
+	user, err := s.findOrCreateUserByIdentity(ctx, profile)
 	if err != nil {
 		return "", Session{}, User{}, err
 	}
@@ -75,11 +173,16 @@ func (s *service) LoginWithProvider(ctx context.Context, provider string, token 
 	}
 
 	expiresAt := time.Now().Add(s.sessionDuration)
-	sess, err := s.repo.CreateSession(ctx, user.ID, tokenHash, userAgent, ipAddr, expiresAt)
+	sess, err := s.q.CreateSession(ctx, dbgen.CreateSessionParams{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		UserAgent: userAgent,
+		IpAddress: ipAddr,
+		ExpiresAt: expiresAt,
+	})
 	if err != nil {
 		return "", Session{}, User{}, err
 	}
-	sess.IsCurrent = true
 
 	return rawToken, sess, user, nil
 }
@@ -90,16 +193,16 @@ func (s *service) LoginWithPassword(ctx context.Context, email, password string,
 		return "", Session{}, User{}, ErrInvalidCredentials
 	}
 
-	user, passwordHash, err := s.repo.GetUserWithPasswordByEmail(ctx, email)
+	user, err := s.q.GetUserWithPasswordByEmail(ctx, email)
 	if err != nil {
 		return "", Session{}, User{}, ErrInvalidCredentials
 	}
 
-	if passwordHash == nil || *passwordHash == "" {
+	if user.PasswordHash == nil || *user.PasswordHash == "" {
 		return "", Session{}, User{}, ErrInvalidCredentials
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(*passwordHash), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
 		return "", Session{}, User{}, ErrInvalidCredentials
 	}
 
@@ -119,11 +222,16 @@ func (s *service) LoginWithPassword(ctx context.Context, email, password string,
 	}
 
 	expiresAt := time.Now().Add(s.sessionDuration)
-	sess, err := s.repo.CreateSession(ctx, user.ID, tokenHash, userAgent, ipAddr, expiresAt)
+	sess, err := s.q.CreateSession(ctx, dbgen.CreateSessionParams{
+		UserID:    user.ID,
+		TokenHash: tokenHash,
+		UserAgent: userAgent,
+		IpAddress: ipAddr,
+		ExpiresAt: expiresAt,
+	})
 	if err != nil {
 		return "", Session{}, User{}, err
 	}
-	sess.IsCurrent = true
 
 	return rawToken, sess, user, nil
 }
@@ -134,23 +242,46 @@ func (s *service) ValidateSession(ctx context.Context, rawToken string) (User, S
 		return User{}, Session{}, ErrUnauthorized
 	}
 
-	tokenHash := hashToken(rawToken)
-	sess, user, err := s.repo.GetSessionAndUserByTokenHash(ctx, tokenHash)
+	tokenHash := HashToken(rawToken)
+	row, err := s.q.GetSessionAndUserByTokenHash(ctx, tokenHash)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return User{}, Session{}, ErrSessionNotFound
+		}
 		return User{}, Session{}, err
 	}
 
+	sess := Session{
+		ID:           row.SessionID,
+		UserID:       row.UserID,
+		TokenHash:    row.TokenHash,
+		UserAgent:    row.UserAgent,
+		IpAddress:    row.IpAddress,
+		ExpiresAt:    row.ExpiresAt,
+		CreatedAt:    row.SessionCreatedAt,
+		LastActiveAt: row.LastActiveAt,
+	}
+
+	user := User{
+		ID:        row.UserPk,
+		Email:     row.Email,
+		Name:      row.Name,
+		AvatarUrl: row.AvatarUrl,
+		IsAdmin:   row.IsAdmin,
+		CreatedAt: row.UserCreatedAt,
+		UpdatedAt: row.UserUpdatedAt,
+	}
+
 	if sess.ExpiresAt.Before(time.Now()) {
-		_ = s.repo.DeleteSessionByTokenHash(ctx, tokenHash)
+		_, _ = s.q.DeleteSessionByTokenHash(ctx, tokenHash)
 		return User{}, Session{}, ErrSessionExpired
 	}
 
 	// Throttle updating last_active_at (e.g. once every 5 minutes)
 	if time.Since(sess.LastActiveAt) > 5*time.Minute {
-		_ = s.repo.TouchSession(ctx, sess.ID)
+		_ = s.q.TouchSession(ctx, sess.ID)
 	}
 
-	sess.IsCurrent = true
 	return user, sess, nil
 }
 
@@ -159,23 +290,39 @@ func (s *service) Logout(ctx context.Context, rawToken string) error {
 	if rawToken == "" {
 		return nil
 	}
-	return s.repo.DeleteSessionByTokenHash(ctx, hashToken(rawToken))
+	_, err := s.q.DeleteSessionByTokenHash(ctx, HashToken(rawToken))
+	return err
 }
 
 func (s *service) RevokeSession(ctx context.Context, sessionID, userID uuid.UUID) error {
-	return s.repo.DeleteSessionByID(ctx, sessionID, userID)
+	n, err := s.q.DeleteSessionByID(ctx, dbgen.DeleteSessionByIDParams{
+		ID:     sessionID,
+		UserID: userID,
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
 }
 
 func (s *service) RevokeAllSessions(ctx context.Context, userID uuid.UUID) error {
-	return s.repo.DeleteAllSessions(ctx, userID)
+	_, err := s.q.DeleteAllSessionsForUser(ctx, userID)
+	return err
 }
 
 func (s *service) RevokeOtherSessions(ctx context.Context, rawToken string, userID uuid.UUID) error {
-	return s.repo.DeleteOtherSessions(ctx, userID, hashToken(rawToken))
+	_, err := s.q.DeleteOtherSessionsForUser(ctx, dbgen.DeleteOtherSessionsForUserParams{
+		UserID:    userID,
+		TokenHash: HashToken(rawToken),
+	})
+	return err
 }
 
 func (s *service) ListSessions(ctx context.Context, userID uuid.UUID, rawToken string) ([]Session, error) {
-	return s.repo.ListActiveSessions(ctx, userID, hashToken(rawToken))
+	return s.q.ListActiveSessionsForUser(ctx, userID)
 }
 
 func generateSessionToken() (string, string, error) {
@@ -184,10 +331,10 @@ func generateSessionToken() (string, string, error) {
 		return "", "", err
 	}
 	rawToken := base64.RawURLEncoding.EncodeToString(b)
-	return rawToken, hashToken(rawToken), nil
+	return rawToken, HashToken(rawToken), nil
 }
 
-func hashToken(rawToken string) string {
+func HashToken(rawToken string) string {
 	sum := sha256.Sum256([]byte(rawToken))
 	return hex.EncodeToString(sum[:])
 }

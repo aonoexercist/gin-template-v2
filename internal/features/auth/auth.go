@@ -1,6 +1,38 @@
 package auth
 
-import "time"
+import (
+	"errors"
+	"time"
+
+	"gin-template-v2/internal/platform/dbgen"
+)
+
+// User is the sqlc row type. No hand-written copy, no mapper to keep
+// in sync: add a column in the migration + query.sql and it appears here.
+type User = dbgen.User
+
+// Session is the sqlc row type.
+type Session = dbgen.Session
+
+// ClientInfo encapsulates metadata from the client request.
+type ClientInfo struct {
+	UserAgent string
+	IPAddress string
+}
+
+var (
+	ErrInvalidToken        = errors.New("invalid or expired token")
+	ErrUnsupportedProvider = errors.New("unsupported authentication provider")
+	ErrEmailNotVerified    = errors.New("provider email is not verified")
+	ErrInvalidCredentials  = errors.New("invalid email or password")
+	ErrSessionNotFound     = errors.New("session not found")
+	ErrSessionExpired      = errors.New("session expired")
+	ErrUnauthorized        = errors.New("unauthorized")
+	ErrUserNotFound        = errors.New("user not found")
+	ErrInvalidInput        = errors.New("invalid input")
+)
+
+// ---- HTTP DTOs ----
 
 // OAuthLoginRequest carries the token passed from the frontend (e.g. Google ID token).
 type OAuthLoginRequest struct {
@@ -46,21 +78,21 @@ func newUserResponse(u User) UserResponse {
 		ID:        u.ID.String(),
 		Email:     u.Email,
 		Name:      u.Name,
-		AvatarURL: u.AvatarURL,
+		AvatarURL: u.AvatarUrl,
 		IsAdmin:   u.IsAdmin,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}
 }
 
-func newSessionResponse(s Session) SessionResponse {
+func newSessionResponse(s Session, isCurrent bool) SessionResponse {
 	return SessionResponse{
 		ID:           s.ID.String(),
 		UserAgent:    s.UserAgent,
-		IPAddress:    s.IPAddress,
+		IPAddress:    s.IpAddress,
 		ExpiresAt:    s.ExpiresAt,
 		CreatedAt:    s.CreatedAt,
 		LastActiveAt: s.LastActiveAt,
-		IsCurrent:    s.IsCurrent,
+		IsCurrent:    isCurrent,
 	}
 }

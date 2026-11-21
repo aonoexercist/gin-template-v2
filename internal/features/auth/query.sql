@@ -1,23 +1,23 @@
 -- name: GetUserByIdentity :one
-SELECT u.id, u.email, u.name, u.avatar_url, u.is_admin, u.created_at, u.updated_at
+SELECT u.*
 FROM users u
 JOIN user_identities ui ON ui.user_id = u.id
 WHERE ui.provider = $1 AND ui.provider_user_id = $2;
 
 -- name: GetUserByEmail :one
-SELECT id, email, name, avatar_url, is_admin, created_at, updated_at
+SELECT *
 FROM users
 WHERE email = $1;
 
 -- name: GetUserWithPasswordByEmail :one
-SELECT id, email, name, password_hash, avatar_url, is_admin, created_at, updated_at
+SELECT *
 FROM users
 WHERE email = $1;
 
 -- name: CreateOAuthUser :one
 INSERT INTO users (email, name, avatar_url)
 VALUES ($1, $2, $3)
-RETURNING id, email, name, avatar_url, is_admin, created_at, updated_at;
+RETURNING *;
 
 -- name: UpdateUserAvatarAndName :one
 UPDATE users
@@ -25,7 +25,7 @@ SET avatar_url = COALESCE(sqlc.narg(avatar_url), avatar_url),
     name = COALESCE(sqlc.narg(name), name),
     updated_at = now()
 WHERE id = sqlc.arg(id)
-RETURNING id, email, name, avatar_url, is_admin, created_at, updated_at;
+RETURNING *;
 
 -- name: CreateIdentity :one
 INSERT INTO user_identities (user_id, provider, provider_user_id)

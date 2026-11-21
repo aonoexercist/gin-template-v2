@@ -1,14 +1,17 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"gin-template-v2/internal/config"
 	"gin-template-v2/internal/platform/httpx"
+	"gin-template-v2/internal/platform/logger"
 )
 
 // Handler handles HTTP requests for authentication and session lifecycle.
@@ -61,7 +64,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 	httpx.JSON(c, http.StatusOK, AuthResponse{
 		User:    newUserResponse(user),
-		Session: newSessionResponse(session),
+		Session: newSessionResponse(session, true),
 	})
 }
 
@@ -93,7 +96,7 @@ func (h *Handler) handleProviderLogin(c *gin.Context, provider string) {
 
 	httpx.JSON(c, http.StatusOK, AuthResponse{
 		User:    newUserResponse(user),
-		Session: newSessionResponse(session),
+		Session: newSessionResponse(session, true),
 	})
 }
 
@@ -114,7 +117,7 @@ func (h *Handler) Me(c *gin.Context) {
 
 	httpx.JSON(c, http.StatusOK, AuthResponse{
 		User:    newUserResponse(user),
-		Session: newSessionResponse(sess),
+		Session: newSessionResponse(sess, true),
 	})
 }
 
@@ -157,6 +160,7 @@ func (h *Handler) ListSessions(c *gin.Context) {
 
 	rawToken, _ := c.Get("auth_token")
 	tokenStr, _ := rawToken.(string)
+	currentTokenHash := HashToken(tokenStr)
 
 	sessions, err := h.svc.ListSessions(c.Request.Context(), user.ID, tokenStr)
 	if err != nil {
@@ -166,7 +170,7 @@ func (h *Handler) ListSessions(c *gin.Context) {
 
 	out := make([]SessionResponse, len(sessions))
 	for i, s := range sessions {
-		out[i] = newSessionResponse(s)
+		out[i] = newSessionResponse(s, s.TokenHash == currentTokenHash)
 	}
 
 	httpx.JSON(c, http.StatusOK, out)
@@ -237,5 +241,36 @@ func parseSameSite(s string) http.SameSite {
 		return http.SameSiteStrictMode
 	default:
 		return http.SameSiteLaxMode
+	}
+}
+
+func parseUUID(c *gin.Context, param string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param(param))
+	if err != nil {
+		httpx.Error(c, http.StatusBadRequest, "invalid_id", "ID must be a valid UUID")
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+func (h *Handler) fail(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, ErrInvalidToken):
+		httpx.Error(c, http.StatusUnauthorized, "invalid_token", err.Error())
+	case errors.Is(err, ErrInvalidCredentials):
+		httpx.Error(c, http.StatusUnauthorized, "invalid_credentials", "Invalid email or password")
+	case errors.Is(err, ErrUnsupportedProvider):
+		httpx.Error(c, http.StatusBadRequest, "unsupported_provider", err.Error())
+	case errors.Is(err, ErrEmailNotVerified):
+		httpx.Error(c, http.StatusForbidden, "email_not_verified", "OAuth account email must be verified")
+	case errors.Is(err, ErrSessionNotFound), errors.Is(err, ErrSessionExpired), errors.Is(err, ErrUnauthorized):
+		httpx.Error(c, http.StatusUnauthorized, "unauthorized", "Unauthorized")
+	case errors.Is(err, ErrUserNotFound):
+		httpx.Error(c, http.StatusNotFound, "user_not_found", "User not found")
+	case errors.Is(err, ErrInvalidInput):
+		httpx.Error(c, http.StatusUnprocessableEntity, "validation_error", "Invalid input")
+	default:
+		logger.FromContext(c.Request.Context()).Error("auth: unexpected error", "error", err)
+		httpx.Error(c, http.StatusInternalServerError, "internal_error", "Internal server error")
 	}
 }

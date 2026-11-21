@@ -7,48 +7,81 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"gin-template-v2/internal/features/auth"
+	"gin-template-v2/internal/platform/dbgen"
 )
 
-type mockRepo struct {
-	users     map[uuid.UUID]auth.User
-	passwords map[uuid.UUID]string
-	sessions  map[string]auth.Session // key is tokenHash
+type mockQuerier struct {
+	dbgen.Querier
+	users      map[uuid.UUID]dbgen.User
+	identities map[string]uuid.UUID     // key: provider:provider_user_id -> user_id
+	sessions   map[string]dbgen.Session // key: tokenHash -> session
 }
 
-func newMockRepo() *mockRepo {
-	return &mockRepo{
-		users:     make(map[uuid.UUID]auth.User),
-		passwords: make(map[uuid.UUID]string),
-		sessions:  make(map[string]auth.Session),
+func newMockQuerier() *mockQuerier {
+	return &mockQuerier{
+		users:      make(map[uuid.UUID]dbgen.User),
+		identities: make(map[string]uuid.UUID),
+		sessions:   make(map[string]dbgen.Session),
 	}
 }
 
-func (m *mockRepo) GetUserWithPasswordByEmail(ctx context.Context, email string) (auth.User, *string, error) {
-	for id, u := range m.users {
-		if u.Email == email {
-			if pw, ok := m.passwords[id]; ok {
-				return u, &pw, nil
-			}
-			return u, nil, nil
-		}
+func (m *mockQuerier) GetUserByIdentity(ctx context.Context, arg dbgen.GetUserByIdentityParams) (dbgen.User, error) {
+	key := arg.Provider + ":" + arg.ProviderUserID
+	userID, ok := m.identities[key]
+	if !ok {
+		return dbgen.User{}, pgx.ErrNoRows
 	}
-	return auth.User{}, nil, auth.ErrUserNotFound
+	u, ok := m.users[userID]
+	if !ok {
+		return dbgen.User{}, pgx.ErrNoRows
+	}
+	return u, nil
 }
 
-func (m *mockRepo) FindOrCreateUserByIdentity(ctx context.Context, profile *auth.OAuthProfile) (auth.User, error) {
+func (m *mockQuerier) UpdateUserAvatarAndName(ctx context.Context, arg dbgen.UpdateUserAvatarAndNameParams) (dbgen.User, error) {
+	u, ok := m.users[arg.ID]
+	if !ok {
+		return dbgen.User{}, pgx.ErrNoRows
+	}
+	if arg.AvatarUrl != nil {
+		u.AvatarUrl = arg.AvatarUrl
+	}
+	if arg.Name != nil {
+		u.Name = *arg.Name
+	}
+	u.UpdatedAt = time.Now()
+	m.users[arg.ID] = u
+	return u, nil
+}
+
+func (m *mockQuerier) GetUserByEmail(ctx context.Context, email string) (dbgen.User, error) {
 	for _, u := range m.users {
-		if u.Email == profile.Email {
+		if u.Email == email {
 			return u, nil
 		}
 	}
-	u := auth.User{
+	return dbgen.User{}, pgx.ErrNoRows
+}
+
+func (m *mockQuerier) GetUserWithPasswordByEmail(ctx context.Context, email string) (dbgen.User, error) {
+	for _, u := range m.users {
+		if u.Email == email {
+			return u, nil
+		}
+	}
+	return dbgen.User{}, pgx.ErrNoRows
+}
+
+func (m *mockQuerier) CreateOAuthUser(ctx context.Context, arg dbgen.CreateOAuthUserParams) (dbgen.User, error) {
+	u := dbgen.User{
 		ID:        uuid.New(),
-		Email:     profile.Email,
-		Name:      profile.Name,
-		AvatarURL: profile.AvatarURL,
+		Email:     arg.Email,
+		Name:      arg.Name,
+		AvatarUrl: arg.AvatarUrl,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -56,36 +89,65 @@ func (m *mockRepo) FindOrCreateUserByIdentity(ctx context.Context, profile *auth
 	return u, nil
 }
 
-func (m *mockRepo) CreateSession(ctx context.Context, userID uuid.UUID, tokenHash string, userAgent, ipAddress *string, expiresAt time.Time) (auth.Session, error) {
-	s := auth.Session{
+func (m *mockQuerier) CreateIdentity(ctx context.Context, arg dbgen.CreateIdentityParams) (dbgen.UserIdentity, error) {
+	key := arg.Provider + ":" + arg.ProviderUserID
+	m.identities[key] = arg.UserID
+	return dbgen.UserIdentity{
+		ID:             uuid.New(),
+		UserID:         arg.UserID,
+		Provider:       arg.Provider,
+		ProviderUserID: arg.ProviderUserID,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}, nil
+}
+
+func (m *mockQuerier) CreateSession(ctx context.Context, arg dbgen.CreateSessionParams) (dbgen.Session, error) {
+	s := dbgen.Session{
 		ID:           uuid.New(),
-		UserID:       userID,
-		TokenHash:    tokenHash,
-		UserAgent:    userAgent,
-		IPAddress:    ipAddress,
-		ExpiresAt:    expiresAt,
+		UserID:       arg.UserID,
+		TokenHash:    arg.TokenHash,
+		UserAgent:    arg.UserAgent,
+		IpAddress:    arg.IpAddress,
+		ExpiresAt:    arg.ExpiresAt,
 		CreatedAt:    time.Now(),
 		LastActiveAt: time.Now(),
 	}
-	m.sessions[tokenHash] = s
+	m.sessions[arg.TokenHash] = s
 	return s, nil
 }
 
-func (m *mockRepo) GetSessionAndUserByTokenHash(ctx context.Context, tokenHash string) (auth.Session, auth.User, error) {
+func (m *mockQuerier) GetSessionAndUserByTokenHash(ctx context.Context, tokenHash string) (dbgen.GetSessionAndUserByTokenHashRow, error) {
 	s, ok := m.sessions[tokenHash]
 	if !ok {
-		return auth.Session{}, auth.User{}, auth.ErrSessionNotFound
+		return dbgen.GetSessionAndUserByTokenHashRow{}, pgx.ErrNoRows
 	}
 	u, ok := m.users[s.UserID]
 	if !ok {
-		return auth.Session{}, auth.User{}, auth.ErrUserNotFound
+		return dbgen.GetSessionAndUserByTokenHashRow{}, pgx.ErrNoRows
 	}
-	return s, u, nil
+	return dbgen.GetSessionAndUserByTokenHashRow{
+		SessionID:        s.ID,
+		UserID:           s.UserID,
+		TokenHash:        s.TokenHash,
+		UserAgent:        s.UserAgent,
+		IpAddress:        s.IpAddress,
+		ExpiresAt:        s.ExpiresAt,
+		SessionCreatedAt: s.CreatedAt,
+		LastActiveAt:     s.LastActiveAt,
+		UserPk:           u.ID,
+		Email:            u.Email,
+		Name:             u.Name,
+		AvatarUrl:        u.AvatarUrl,
+		IsAdmin:          u.IsAdmin,
+		UserCreatedAt:    u.CreatedAt,
+		UserUpdatedAt:    u.UpdatedAt,
+	}, nil
 }
 
-func (m *mockRepo) TouchSession(ctx context.Context, sessionID uuid.UUID) error {
+func (m *mockQuerier) TouchSession(ctx context.Context, id uuid.UUID) error {
 	for k, s := range m.sessions {
-		if s.ID == sessionID {
+		if s.ID == id {
 			s.LastActiveAt = time.Now()
 			m.sessions[k] = s
 			return nil
@@ -94,55 +156,28 @@ func (m *mockRepo) TouchSession(ctx context.Context, sessionID uuid.UUID) error 
 	return nil
 }
 
-func (m *mockRepo) DeleteSessionByTokenHash(ctx context.Context, tokenHash string) error {
-	delete(m.sessions, tokenHash)
-	return nil
+func (m *mockQuerier) DeleteSessionByTokenHash(ctx context.Context, tokenHash string) (int64, error) {
+	if _, ok := m.sessions[tokenHash]; ok {
+		delete(m.sessions, tokenHash)
+		return 1, nil
+	}
+	return 0, nil
 }
 
-func (m *mockRepo) DeleteSessionByID(ctx context.Context, sessionID, userID uuid.UUID) error {
+func (m *mockQuerier) DeleteSessionByID(ctx context.Context, arg dbgen.DeleteSessionByIDParams) (int64, error) {
 	for k, s := range m.sessions {
-		if s.ID == sessionID && s.UserID == userID {
+		if s.ID == arg.ID && s.UserID == arg.UserID {
 			delete(m.sessions, k)
-			return nil
+			return 1, nil
 		}
 	}
-	return auth.ErrSessionNotFound
+	return 0, nil
 }
 
-func (m *mockRepo) DeleteOtherSessions(ctx context.Context, userID uuid.UUID, currentTokenHash string) error {
-	for k, s := range m.sessions {
-		if s.UserID == userID && k != currentTokenHash {
-			delete(m.sessions, k)
-		}
-	}
-	return nil
-}
-
-func (m *mockRepo) DeleteAllSessions(ctx context.Context, userID uuid.UUID) error {
-	for k, s := range m.sessions {
-		if s.UserID == userID {
-			delete(m.sessions, k)
-		}
-	}
-	return nil
-}
-
-func (m *mockRepo) ListActiveSessions(ctx context.Context, userID uuid.UUID, currentTokenHash string) ([]auth.Session, error) {
-	var out []auth.Session
-	for k, s := range m.sessions {
-		if s.UserID == userID {
-			s.IsCurrent = (k == currentTokenHash)
-			out = append(out, s)
-		}
-	}
-	return out, nil
-}
-
-func (m *mockRepo) CleanExpiredSessions(ctx context.Context) (int64, error) {
+func (m *mockQuerier) DeleteOtherSessionsForUser(ctx context.Context, arg dbgen.DeleteOtherSessionsForUserParams) (int64, error) {
 	var count int64
-	now := time.Now()
 	for k, s := range m.sessions {
-		if !s.ExpiresAt.After(now) {
+		if s.UserID == arg.UserID && k != arg.TokenHash {
 			delete(m.sessions, k)
 			count++
 		}
@@ -150,8 +185,30 @@ func (m *mockRepo) CleanExpiredSessions(ctx context.Context) (int64, error) {
 	return count, nil
 }
 
+func (m *mockQuerier) DeleteAllSessionsForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
+	var count int64
+	for k, s := range m.sessions {
+		if s.UserID == userID {
+			delete(m.sessions, k)
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *mockQuerier) ListActiveSessionsForUser(ctx context.Context, userID uuid.UUID) ([]dbgen.Session, error) {
+	var out []dbgen.Session
+	now := time.Now()
+	for _, s := range m.sessions {
+		if s.UserID == userID && s.ExpiresAt.After(now) {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
 func TestMultiDeviceSessions(t *testing.T) {
-	repo := newMockRepo()
+	q := newMockQuerier()
 	reg := auth.NewProviderRegistry()
 	reg.Register("google", &mockVerifier{
 		profile: &auth.OAuthProfile{
@@ -162,7 +219,7 @@ func TestMultiDeviceSessions(t *testing.T) {
 		},
 	})
 
-	svc := auth.NewService(repo, reg, 24*time.Hour)
+	svc := auth.NewService(q, nil, reg, 24*time.Hour)
 	ctx := context.Background()
 
 	// 1. Login on PC 1 (Chrome on Windows)
@@ -203,21 +260,13 @@ func TestMultiDeviceSessions(t *testing.T) {
 		t.Fatalf("validate PC2 session failed: %v", err)
 	}
 
-	// 4. Listing sessions from PC 1 should show 2 sessions, with sess1 marked as current
+	// 4. Listing sessions from PC 1 should show 2 sessions
 	sessionsFromPC1, err := svc.ListSessions(ctx, user1.ID, token1)
 	if err != nil {
 		t.Fatalf("list sessions failed: %v", err)
 	}
 	if len(sessionsFromPC1) != 2 {
 		t.Fatalf("expected 2 active sessions, got %d", len(sessionsFromPC1))
-	}
-	for _, s := range sessionsFromPC1 {
-		if s.ID == sess1.ID && !s.IsCurrent {
-			t.Errorf("sess1 should be marked as current from PC1")
-		}
-		if s.ID == sess2.ID && s.IsCurrent {
-			t.Errorf("sess2 should not be marked as current from PC1")
-		}
 	}
 
 	// 5. Revoking PC 2 session from PC 1
@@ -250,34 +299,35 @@ func TestMultiDeviceSessions(t *testing.T) {
 }
 
 func TestLoginWithPassword(t *testing.T) {
-	repo := newMockRepo()
+	q := newMockQuerier()
 	reg := auth.NewProviderRegistry()
-	svc := auth.NewService(repo, reg, 24*time.Hour)
+	svc := auth.NewService(q, nil, reg, 24*time.Hour)
 	ctx := context.Background()
 
 	// Setup a user with a hashed password
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("secretPassword123"), bcrypt.DefaultCost)
+	hashedPasswordStr := string(hashedPassword)
 	userID := uuid.New()
-	user := auth.User{
-		ID:        userID,
-		Email:     "alex@example.com",
-		Name:      "Alex",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+	user := dbgen.User{
+		ID:           userID,
+		Email:        "alex@example.com",
+		Name:         "Alex",
+		PasswordHash: &hashedPasswordStr,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
-	repo.users[userID] = user
-	repo.passwords[userID] = string(hashedPassword)
+	q.users[userID] = user
 
 	// Setup an OAuth-only user (no password set)
 	oauthUserID := uuid.New()
-	oauthUser := auth.User{
+	oauthUser := dbgen.User{
 		ID:        oauthUserID,
 		Email:     "oauth@example.com",
 		Name:      "OAuth User",
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	repo.users[oauthUserID] = oauthUser
+	q.users[oauthUserID] = oauthUser
 
 	// 1. Success case: correct email and password
 	token, session, loggedInUser, err := svc.LoginWithPassword(ctx, "alex@example.com", "secretPassword123", auth.ClientInfo{
