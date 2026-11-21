@@ -12,10 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"gin-template-v2/internal/config"
-	"gin-template-v2/internal/features/auth"
+	"gin-template-v2/internal/platform/dbgen"
 )
 
-// sessionCleaner is satisfied by auth.Repository, allowing the server to run
+// sessionCleaner is satisfied by *dbgen.Queries, allowing the server to run
 // periodic expired-session cleanup without depending on the full auth package.
 type sessionCleaner interface {
 	CleanExpiredSessions(ctx context.Context) (int64, error)
@@ -29,11 +29,11 @@ type Server struct {
 }
 
 func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
-	authRepo := auth.NewRepository(pool)
+	q := dbgen.New(pool)
 	return &Server{
 		http: &http.Server{
 			Addr:              fmt.Sprintf(":%d", cfg.HTTP.Port),
-			Handler:           NewRouter(cfg, log, pool, authRepo),
+			Handler:           NewRouter(cfg, log, pool),
 			ReadHeaderTimeout: 5 * time.Second,
 			ReadTimeout:       cfg.HTTP.ReadTimeout,
 			WriteTimeout:      cfg.HTTP.WriteTimeout,
@@ -41,7 +41,7 @@ func New(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *Server {
 		},
 		log:             log,
 		shutdownTimeout: cfg.HTTP.ShutdownTimeout,
-		cleaner:         authRepo,
+		cleaner:         q,
 	}
 }
 
