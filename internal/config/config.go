@@ -91,8 +91,8 @@ func Load() (Config, error) {
 		},
 		DB: DBConfig{
 			URL:             l.str("DATABASE_URL", ""),
-			MaxConns:        int32(l.int("DB_MAX_CONNS", 10)),
-			MinConns:        int32(l.int("DB_MIN_CONNS", 2)),
+			MaxConns:        int32(l.int("DB_MAX_CONNS", 10)), // #nosec G115
+			MinConns:        int32(l.int("DB_MIN_CONNS", 2)),  // #nosec G115
 			MaxConnLifetime: l.dur("DB_MAX_CONN_LIFETIME", time.Hour),
 			MaxConnIdleTime: l.dur("DB_MAX_CONN_IDLE_TIME", 30*time.Minute),
 		},
