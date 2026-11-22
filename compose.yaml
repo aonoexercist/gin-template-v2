@@ -1,6 +1,6 @@
 # Compose file for Docker (`docker compose`) and Podman (`podman compose` / podman-compose).
 # Values come from .env (copy .env.example). Run:  make up
-name: github.com/aonoexercist/gin-template-v2
+name: gin-template-v2
 
 services:
   db:
