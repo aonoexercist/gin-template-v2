@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
 
 	"github.com/google/uuid"
 )

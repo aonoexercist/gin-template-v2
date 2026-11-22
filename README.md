@@ -52,7 +52,7 @@ A production-ready, feature-based Go REST API starter built with **Gin**, **Post
   - Multi-stage `Dockerfile` with minimal distroless runtime and unprivileged user.
   - `compose.yaml` with database health check, automatic Goose migration container, the API server, and **Adminer** database management UI (`http://localhost:8088`).
   - Native support for both **Docker** and **Podman**.
-- **Development Tooling**: Hot-reload via `air`, `golangci-lint`, race-enabled testing, and automated Makefile targets.
+- **Development Tooling**: Hot-reload via `air`, `golangci-lint`, race-enabled testing, a feature scaffolding generator, and automated Makefile targets.
 
 ---
 
@@ -94,6 +94,7 @@ internal/
   version/                    # Build-time version and git commit metadata
 scripts/
   rename.sh                   # Module renaming utility
+  scaffold-feature.sh         # Feature generator (migration, queries, service, handler, routes)
 .air.toml                     # Air hot reload configuration
 .env.example                  # Environment variable template
 compose.yaml                  # Multi-container stack (db, migrate, api, adminer)
@@ -393,22 +394,65 @@ You can add a feature in seconds with the automated generator, or follow the ste
 Generate the complete boilerplate in one command:
 
 ```bash
-make feature name=posts
+# Main text column defaults to "name"
+make feature name=teams
+
+# Choose a different column name with field=
+make feature name=posts field=title
+make feature name=users field=full_name
 ```
 
-This creates:
-- The database migration in `db/migrations/<timestamp>_create_posts_table.sql`
-- `internal/features/posts/query.sql` with standard CRUD queries
-- `internal/features/posts/posts.go` (models, DTOs, and response mappers)
-- `internal/features/posts/service.go` (business logic)
-- `internal/features/posts/handler.go` (HTTP handlers with domain response mapping)
-- `internal/features/posts/route.go` (route registrations)
+The script can also be run directly: `./scripts/scaffold-feature.sh <feature> [field]`.
 
-Then simply apply migrations, run sqlc, and wire the router:
-```bash
-make migrate-up
-make sqlc
-```
+#### Arguments
+
+| Argument | Required | Default | Description |
+|---|---|---|---|
+| `name` | yes | — | Feature (and table) name, e.g. `posts`. Lowercased and stripped to letters, digits, and underscores. A trailing `s` is dropped for the Go type name (`posts` → `Post`). |
+| `field` | no | `name` | Name of the main `TEXT NOT NULL` column, in `snake_case` (e.g. `title`, `name`, `full_name`). It must start with a letter and cannot be `id`, `created_at`, or `updated_at`. |
+
+Pick the field that matches what the entity is: `title` suits content with a headline (posts, articles, tasks), while `name` suits things referred to by a label (teams, projects, categories). The Go field name is derived automatically (`full_name` → `FullName`), matching what `sqlc` generates.
+
+#### What it creates
+
+- The database migration in `db/migrations/<timestamp>_create_<feature>_table.sql` (columns: `id`, the chosen field, `created_at`, `updated_at`)
+- `internal/features/<feature>/query.sql` with standard CRUD queries
+- `internal/features/<feature>/<feature>.go` (models, DTOs, and response mappers)
+- `internal/features/<feature>/service.go` (business logic)
+- `internal/features/<feature>/handler.go` (HTTP handlers with domain response mapping)
+- `internal/features/<feature>/route.go` (route registrations)
+
+The scaffold is a starting point: add extra columns, validation, and queries to the generated files as your feature needs them.
+
+#### After scaffolding
+
+1. Review the generated migration, then apply it and generate the `sqlc` code:
+   ```bash
+   make migrate-up
+   make sqlc
+   ```
+2. Tidy struct alignment in the generated Go files:
+   ```bash
+   gofmt -w internal/features/<feature>
+   ```
+3. Wire the feature into `internal/server/router.go` (example for `posts`):
+   ```go
+   import "<your-module>/internal/features/posts"
+
+   // Under dependency wiring:
+   postsHandler := posts.NewHandler(posts.NewService(q))
+
+   // Under API v1 route mounting:
+   posts.RegisterRoutes(v1, postsHandler, authMiddleware)
+   ```
+
+> [!NOTE]
+> `make feature` forwards `field` to the script. If your `Makefile` target predates this option, make sure it passes both variables:
+> ```make
+> feature:
+> 	./scripts/scaffold-feature.sh $(name) $(field)
+> ```
+> When `field` is empty, the script falls back to `name`.
 
 ---
 
@@ -756,7 +800,7 @@ Develop
   fmt               Format Go code with gofmt
   vet               Run go vet
   tidy              Run go mod tidy
-  feature           Scaffold a new feature: make feature name=posts
+  feature           Scaffold a new feature: make feature name=posts [field=title]
 
 Database
   sqlc              Regenerate Go code from SQL queries

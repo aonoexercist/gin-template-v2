@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"gin-template-v2/internal/features/auth"
+	"github.com/aonoexercist/gin-template-v2/internal/features/auth"
 )
 
 type mockVerifier struct {

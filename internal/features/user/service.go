@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"

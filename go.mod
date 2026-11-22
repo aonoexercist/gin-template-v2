@@ -1,4 +1,4 @@
-module gin-template-v2
+module github.com/aonoexercist/gin-template-v2
 
 go 1.26.0
 

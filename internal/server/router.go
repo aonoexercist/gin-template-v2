@@ -7,13 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"gin-template-v2/internal/config"
-	"gin-template-v2/internal/features/auth"
-	"gin-template-v2/internal/features/health"
-	users "gin-template-v2/internal/features/user"
-	"gin-template-v2/internal/platform/dbgen"
-	"gin-template-v2/internal/platform/httpx"
-	"gin-template-v2/internal/platform/middleware"
+	"github.com/aonoexercist/gin-template-v2/internal/config"
+	"github.com/aonoexercist/gin-template-v2/internal/features/auth"
+	"github.com/aonoexercist/gin-template-v2/internal/features/health"
+	users "github.com/aonoexercist/gin-template-v2/internal/features/user"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/httpx"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/middleware"
 )
 
 // NewRouter wires middleware, features and API versions.

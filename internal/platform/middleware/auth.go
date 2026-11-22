@@ -5,8 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gin-template-v2/internal/features/auth"
-	"gin-template-v2/internal/platform/httpx"
+	"github.com/aonoexercist/gin-template-v2/internal/features/auth"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/httpx"
 )
 
 const (
