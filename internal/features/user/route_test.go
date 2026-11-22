@@ -101,7 +101,7 @@ func TestOptionB_UserRoutes(t *testing.T) {
 
 	// 3. GET /api/v1/users/:id succeeds for regular authenticated user
 	req = httptest.NewRequest("GET", "/api/v1/users/"+userID, nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -110,7 +110,7 @@ func TestOptionB_UserRoutes(t *testing.T) {
 
 	// 4. GET /api/v1/users (list) is ADMIN-ONLY (fails 403 for regular user)
 	req = httptest.NewRequest("GET", "/api/v1/users", nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
@@ -119,7 +119,7 @@ func TestOptionB_UserRoutes(t *testing.T) {
 
 	// 5. GET /api/v1/users (list) succeeds for admin
 	req = httptest.NewRequest("GET", "/api/v1/users", nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "admin-cookie"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "admin-cookie", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -128,7 +128,7 @@ func TestOptionB_UserRoutes(t *testing.T) {
 
 	// 6. DELETE /api/v1/users/:id is ADMIN-ONLY (fails 403 for regular user)
 	req = httptest.NewRequest("DELETE", "/api/v1/users/"+userID, nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "regular-user-cookie", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
@@ -137,7 +137,7 @@ func TestOptionB_UserRoutes(t *testing.T) {
 
 	// 7. DELETE /api/v1/users/:id succeeds for admin (204 No Content)
 	req = httptest.NewRequest("DELETE", "/api/v1/users/"+userID, nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "admin-cookie"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "admin-cookie", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent {
