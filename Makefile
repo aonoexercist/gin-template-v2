@@ -95,4 +95,4 @@ tools: ## Install goose, sqlc, air, golangci-lint
 	go install github.com/pressly/goose/v3/cmd/goose@v3.22.1
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0
 	go install github.com/air-verse/air@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
