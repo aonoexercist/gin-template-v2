@@ -64,11 +64,12 @@ func healthcheck() int {
 		port = "8080"
 	}
 	client := &http.Client{Timeout: 3 * time.Second}
+	// #nosec G704
 	resp, err := client.Get("http://127.0.0.1:" + port + "/healthz")
 	if err != nil {
 		return 1
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body)
 	if resp.StatusCode != http.StatusOK {
 		return 1
