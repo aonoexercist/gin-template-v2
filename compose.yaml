@@ -55,8 +55,11 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # Development only: NEVER expose or run Adminer in production.
   adminer:
     image: adminer:latest
+    profiles:
+      - tools
     restart: unless-stopped
     ports:
       - "${ADMINER_PORT:-8088}:8080"
