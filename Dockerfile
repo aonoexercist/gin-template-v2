@@ -21,9 +21,9 @@ ARG BUILD_DATE=unknown
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath \
       -ldflags="-s -w \
-        -X gin-template-v2/internal/version.Version=${VERSION} \
-        -X gin-template-v2/internal/version.Commit=${COMMIT} \
-        -X gin-template-v2/internal/version.BuildDate=${BUILD_DATE}" \
+        -X github.com/aonoexercist/gin-template-v2/internal/version.Version=${VERSION} \
+        -X github.com/aonoexercist/gin-template-v2/internal/version.Commit=${COMMIT} \
+        -X github.com/aonoexercist/gin-template-v2/internal/version.BuildDate=${BUILD_DATE}" \
       -o /out/api ./cmd/api
 
 RUN --mount=type=cache,target=/go/pkg/mod \

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
 )
 
 // User is the sqlc row type. No hand-written copy, no mapper to keep

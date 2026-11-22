@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"gin-template-v2/internal/platform/httpx"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/httpx"
 )
 
 const HeaderRequestID = "X-Request-ID"

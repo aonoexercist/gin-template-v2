@@ -13,11 +13,11 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"gin-template-v2/internal/config"
-	"gin-template-v2/internal/platform/database"
-	"gin-template-v2/internal/platform/logger"
-	"gin-template-v2/internal/server"
-	"gin-template-v2/internal/version"
+	"github.com/aonoexercist/gin-template-v2/internal/config"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/database"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/logger"
+	"github.com/aonoexercist/gin-template-v2/internal/server"
+	"github.com/aonoexercist/gin-template-v2/internal/version"
 )
 
 func main() {

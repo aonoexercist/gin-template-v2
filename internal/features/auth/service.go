@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 
-	"gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
 )
 
 // Service encapsulates authentication and session management logic.

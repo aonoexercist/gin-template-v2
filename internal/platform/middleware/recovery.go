@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gin-template-v2/internal/platform/httpx"
-	"gin-template-v2/internal/platform/logger"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/httpx"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/logger"
 )
 
 // Recovery turns panics into a logged 500 JSON response. Place it after

@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"gin-template-v2/internal/config"
+	"github.com/aonoexercist/gin-template-v2/internal/config"
 )
 
 // NewPool opens a pgx connection pool and verifies connectivity.

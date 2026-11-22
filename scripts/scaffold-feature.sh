@@ -19,7 +19,7 @@ FEATURE_DIR="internal/features/${FEATURE}"
 MIGRATIONS_DIR="db/migrations"
 
 # Detect module name from go.mod
-MODULE=$(go list -m 2>/dev/null || echo "gin-template-v2")
+MODULE=$(go list -m 2>/dev/null || echo "github.com/aonoexercist/gin-template-v2")
 
 cd "$(dirname "$0")/.."
 

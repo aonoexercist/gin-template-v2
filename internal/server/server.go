@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"gin-template-v2/internal/config"
-	"gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/config"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
 )
 
 // sessionCleaner is satisfied by *dbgen.Queries, allowing the server to run

@@ -10,7 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gin-template-v2/internal/platform/middleware"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/middleware"
 )
 
 func init() { gin.SetMode(gin.TestMode) }

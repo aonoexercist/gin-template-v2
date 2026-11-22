@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"gin-template-v2/internal/features/auth"
-	"gin-template-v2/internal/platform/dbgen"
+	"github.com/aonoexercist/gin-template-v2/internal/features/auth"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/dbgen"
 )
 
 type mockQuerier struct {

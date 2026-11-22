@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"gin-template-v2/internal/features/user"
+	"github.com/aonoexercist/gin-template-v2/internal/features/user"
 )
 
 type mockUserService struct{}

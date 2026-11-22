@@ -9,9 +9,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	"gin-template-v2/internal/config"
-	"gin-template-v2/internal/platform/httpx"
-	"gin-template-v2/internal/platform/logger"
+	"github.com/aonoexercist/gin-template-v2/internal/config"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/httpx"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/logger"
 )
 
 // Handler handles HTTP requests for authentication and session lifecycle.

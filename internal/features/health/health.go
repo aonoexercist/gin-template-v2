@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gin-template-v2/internal/platform/httpx"
-	"gin-template-v2/internal/platform/logger"
-	"gin-template-v2/internal/version"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/httpx"
+	"github.com/aonoexercist/gin-template-v2/internal/platform/logger"
+	"github.com/aonoexercist/gin-template-v2/internal/version"
 )
 
 // Pinger is satisfied by *pgxpool.Pool.
