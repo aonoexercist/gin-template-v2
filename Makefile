@@ -51,8 +51,8 @@ vet: ## go vet
 tidy: ## go mod tidy
 	go mod tidy
 
-feature: ## Scaffold a new feature: make feature name=posts
-	@./scripts/scaffold-feature.sh "$(name)"
+feature: ## Scaffold a new feature: make feature name=posts [field=title]
+	@./scripts/scaffold-feature.sh "$(name)" $(field)
 
 ##@ Database
 .PHONY: sqlc migrate-up migrate-down migrate-status migrate-create db-up db-psql
