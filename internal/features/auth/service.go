@@ -78,7 +78,7 @@ func (s *service) findOrCreateUserByIdentity(ctx context.Context, profile *OAuth
 	}
 
 	// 2. Identity not found: link to existing user or create user + identity
-	var qtx dbgen.Querier = s.q
+	qtx := s.q
 	var tx pgx.Tx
 	if s.pool != nil {
 		var txErr error
@@ -86,7 +86,7 @@ func (s *service) findOrCreateUserByIdentity(ctx context.Context, profile *OAuth
 		if txErr != nil {
 			return User{}, txErr
 		}
-		defer tx.Rollback(ctx)
+		defer func() { _ = tx.Rollback(ctx) }()
 		qtx = dbgen.New(tx)
 	}
 
