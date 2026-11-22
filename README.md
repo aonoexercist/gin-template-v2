@@ -115,9 +115,9 @@ HTTP Request → Router → Middleware → Feature Handler → Feature Service �
 
 ## Prerequisites
 
-- **Go**: 1.23 or newer
+- **Go**: 1.26 or newer
 - **Make**: GNU Make
-- **Container Engine**: Docker (`docker` + `docker compose`) or Podman (`podman` + `podman compose`)
+- **Container Engine**: Docker (`docker` + `docker compose`) or Podman (`podman` + `podman-compose` or `podman compose`)
 - *(Optional for local host development)*: `goose`, `sqlc`, `air`, `golangci-lint` (can be installed with `make tools`)
 
 ---
@@ -148,20 +148,30 @@ The defaults work out-of-the-box for local containerized development.
 
 ### 3a. Run with Containers (Recommended)
 
-Spin up the entire stack (PostgreSQL, database migrations, the API, and Adminer):
+Spin up the core stack (PostgreSQL, database migrations, and the API):
 
 ```bash
 # With Docker:
 make up CONTAINER=docker COMPOSE="docker compose"
 
-# With Podman (default):
+# With Podman (default: uses podman-compose):
 make up
 ```
 
 Services started:
 - **API**: `http://localhost:8080`
 - **PostgreSQL**: `localhost:5432`
+
+To also start the **Adminer DB UI** (isolated under the `tools` compose profile):
+```bash
+make up-tools
+# Or with Docker:
+make up-tools CONTAINER=docker COMPOSE="docker compose"
+```
 - **Adminer DB UI**: `http://localhost:8088` (Server: `db`, Username: `app`, Password: `app`, Database: `app`)
+
+> [!WARNING]
+> **Adminer Security Notice**: Adminer and its default `app/app` credentials are intended strictly for local development and are gated behind the `tools` compose profile. Never expose or deploy Adminer to production.
 
 To view live logs:
 ```bash
@@ -376,7 +386,35 @@ curl http://localhost:8080/readyz
 
 ## How to Add a New Feature
 
-Follow this standardized recipe to add a new domain feature (e.g., `posts`):
+You can add a feature in seconds with the automated generator, or follow the step-by-step manual recipe below.
+
+### Option A: Automated Scaffolding (Recommended)
+
+Generate the complete boilerplate in one command:
+
+```bash
+make feature name=posts
+```
+
+This creates:
+- The database migration in `db/migrations/<timestamp>_create_posts_table.sql`
+- `internal/features/posts/query.sql` with standard CRUD queries
+- `internal/features/posts/posts.go` (models, DTOs, and response mappers)
+- `internal/features/posts/service.go` (business logic)
+- `internal/features/posts/handler.go` (HTTP handlers with domain response mapping)
+- `internal/features/posts/route.go` (route registrations)
+
+Then simply apply migrations, run sqlc, and wire the router:
+```bash
+make migrate-up
+make sqlc
+```
+
+---
+
+### Option B: Step-by-Step Manual Guide
+
+Follow this standardized recipe to manually add a new domain feature (e.g., `posts`):
 
 ### Step 1: Create a Database Migration
 
@@ -436,13 +474,14 @@ Create the following files:
    SELECT count(*) FROM posts;
    ```
 
-2. **`internal/features/posts/posts.go`** (DTOs and models):
+2. **`internal/features/posts/posts.go`** (DTOs, domain models, and mappers):
    ```go
    package posts
 
    import (
        "time"
        "github.com/google/uuid"
+       "<your-module>/internal/platform/dbgen"
    )
 
    type CreatePostRequest struct {
@@ -457,6 +496,17 @@ Create the following files:
        Content   string    `json:"content"`
        CreatedAt time.Time `json:"created_at"`
    }
+
+   // newPostResponse transforms raw database models into safe API responses.
+   func newPostResponse(p dbgen.Post) PostResponse {
+       return PostResponse{
+           ID:        p.ID,
+           UserID:    p.UserID,
+           Title:     p.Title,
+           Content:   p.Content,
+           CreatedAt: p.CreatedAt,
+       }
+   }
    ```
 
 3. **`internal/features/posts/service.go`** (Business logic):
@@ -466,7 +516,7 @@ Create the following files:
    import (
        "context"
        "github.com/google/uuid"
-       "gin-template-v2/internal/platform/dbgen"
+       "<your-module>/internal/platform/dbgen"
    )
 
    type Service interface {
@@ -503,8 +553,8 @@ Create the following files:
        "net/http"
        "github.com/gin-gonic/gin"
        "github.com/google/uuid"
-       "gin-template-v2/internal/platform/httpx"
-       "gin-template-v2/internal/platform/middleware"
+       "<your-module>/internal/platform/httpx"
+       "<your-module>/internal/platform/middleware"
    )
 
    type Handler struct {
@@ -534,7 +584,24 @@ Create the following files:
            return
        }
 
-       httpx.JSON(c, http.StatusCreated, post)
+       // Map to DTO so internal database models never leak to API clients
+       httpx.JSON(c, http.StatusCreated, newPostResponse(post))
+   }
+
+   func (h *Handler) Get(c *gin.Context) {
+       id, err := uuid.Parse(c.Param("id"))
+       if err != nil {
+           httpx.Error(c, http.StatusBadRequest, "invalid_id", "Malformed UUID")
+           return
+       }
+
+       post, err := h.svc.Get(c.Request.Context(), id)
+       if err != nil {
+           httpx.Error(c, http.StatusNotFound, "not_found", "Post not found")
+           return
+       }
+
+       httpx.JSON(c, http.StatusOK, newPostResponse(post))
    }
    ```
 
@@ -549,31 +616,15 @@ Create the following files:
        g.Use(authMiddleware)
        {
            g.POST("", h.Create)
+           g.GET("/:id", h.Get)
        }
    }
    ```
 
-### Step 3: Register in `sqlc.yaml` and Generate Code
+### Step 3: Generate Code with sqlc
 
-Open `sqlc.yaml` and add the new query file under `queries:`:
+`sqlc.yaml` is pre-configured with wildcard query loading (`internal/features/*/query.sql`), so you **do not** need to edit `sqlc.yaml`. Simply run:
 
-```yaml
-sql:
-  - name: app
-    engine: postgresql
-    schema: db/migrations
-    queries:
-      - internal/features/user/query.sql
-      - internal/features/auth/query.sql
-      - internal/features/posts/query.sql  # <-- Add this line
-    gen:
-      go:
-        package: dbgen
-        out: internal/platform/dbgen
-        ...
-```
-
-Run sqlc to compile queries:
 ```bash
 make sqlc
 ```
@@ -584,7 +635,7 @@ In `internal/server/router.go`:
 
 1. Import the new feature package:
    ```go
-   import "gin-template-v2/internal/features/posts"
+   import "<your-module>/internal/features/posts"
    ```
 2. Initialize and register the handler:
    ```go
@@ -632,6 +683,14 @@ Keep breaking modifications confined to the feature's v2 handlers and DTOs; unde
 - The HTTP server starts a background goroutine on launch (`server.runSessionCleanup`).
 - Automatically deletes expired sessions from `user_sessions` every 24 hours.
 
+### CSRF Protection & Cross-Site Considerations
+- **Default Protection (`SameSite=Lax`)**: In typical single-origin or same-site architectures (e.g., `app.domain.com` frontend and `api.domain.com` backend), session cookies configured with `SameSite=Lax` and `HttpOnly` are blocked by browsers from being sent on cross-site state-changing requests. This provides strong, zero-configuration defense against Cross-Site Request Forgery (CSRF).
+- **Cross-Site Frontend (`SameSite=None`)**: If you host your frontend and API on different registrable domains (e.g. `frontend-app.com` and `backend-api.com`), setting `AUTH_COOKIE_SAME_SITE=none` (which requires `AUTH_COOKIE_SECURE=true`) allows browsers to transmit cookies across sites, which **voids** the default CSRF protection.
+- **Recommended Remediation for `SameSite=None`**:
+  1. **Token in Authorization Header**: If building a decoupled SPA/mobile app across domains, consider transmitting tokens via `Authorization: Bearer <token>` headers instead of cookies. Headers are not attached automatically by browsers, preventing CSRF.
+  2. **Anti-CSRF Header / Double Submit Cookie**: Enforce a custom header (e.g. `X-CSRF-Token` or `X-Requested-With`) or a double-submit cookie check on state-changing methods (`POST`, `PUT`, `PATCH`, `DELETE`).
+  3. **Origin Header Verification**: Validate the `Origin` or `Referer` header against your explicit whitelist (`CORS_ALLOWED_ORIGINS`).
+
 ---
 
 ## Database & Migration Workflow
@@ -659,6 +718,10 @@ Configuration is loaded from environment variables (or `.env` during local devel
 |---|---|---|
 | `APP_ENV` | `development` | Application mode: `development`, `production`, `test` |
 | `HTTP_PORT` | `8080` | Port for the HTTP server to listen on |
+| `HTTP_SHUTDOWN_TIMEOUT` | `15s` | Maximum duration to drain active HTTP connections on shutdown |
+| `HTTP_READ_TIMEOUT` | `10s` | Maximum duration for reading request headers and body |
+| `HTTP_WRITE_TIMEOUT` | `15s` | Maximum duration before timing out response writes |
+| `HTTP_IDLE_TIMEOUT` | `60s` | Maximum time to wait for the next request on keep-alive |
 | `LOG_LEVEL` | `debug` (dev) / `info` | Logging verbosity: `debug`, `info`, `warn`, `error` |
 | `LOG_FORMAT` | `text` (dev) / `json` | Logging format: `text` or `json` |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Comma-separated allowed origins; `*` allows any |
@@ -666,6 +729,8 @@ Configuration is loaded from environment variables (or `.env` during local devel
 | `DATABASE_URL` | *required* | Postgres connection string with connection options |
 | `DB_MAX_CONNS` | `10` | Maximum connections in the pgx pool |
 | `DB_MIN_CONNS` | `2` | Minimum idle connections in the pgx pool |
+| `DB_MAX_CONN_LIFETIME` | `1h` | Maximum time a connection may be reused |
+| `DB_MAX_CONN_IDLE_TIME` | `30m` | Maximum time a connection may remain idle |
 | `GOOGLE_CLIENT_ID` | *optional* | Google OAuth Client ID for Google login token verification |
 | `AUTH_COOKIE_NAME` | `sid` | Cookie name for the session token |
 | `AUTH_COOKIE_DOMAIN`| *empty* | Cookie domain attribute |
@@ -691,6 +756,7 @@ Develop
   fmt               Format Go code with gofmt
   vet               Run go vet
   tidy              Run go mod tidy
+  feature           Scaffold a new feature: make feature name=posts
 
 Database
   sqlc              Regenerate Go code from SQL queries
@@ -702,7 +768,8 @@ Database
   db-psql           Open psql inside PostgreSQL container
 
 Containers
-  up                Build and start db + migrations + api + adminer
+  up                Build and start db + migrations + api
+  up-tools          Build and start all services including dev tools (Adminer)
   down              Stop all containers (preserves pgdata volume)
   logs              Tail API container logs
   image             Build production container image
@@ -755,7 +822,7 @@ make down CONTAINER=docker COMPOSE="docker compose"
 5. **Database Migrations in CI/CD**:
    - Run migrations as an independent pipeline step (or Kubernetes init container using the `migrate` Dockerfile target) prior to deploying new API pods.
 6. **Graceful Shutdown**:
-   - The server catches `SIGINT` and `SIGTERM`, drains active connections within `SHUTDOWN_TIMEOUT` (default: 10s), and closes database connection pools safely.
+   - The server catches `SIGINT` and `SIGTERM`, drains active connections within `HTTP_SHUTDOWN_TIMEOUT` (default: 15s), and closes database connection pools safely.
 
 ---
 
