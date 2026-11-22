@@ -10,7 +10,6 @@ import (
 	"gin-template-v2/internal/config"
 	"gin-template-v2/internal/features/auth"
 	"gin-template-v2/internal/features/health"
-	"gin-template-v2/internal/features/organization"
 	users "gin-template-v2/internal/features/user"
 	"gin-template-v2/internal/platform/dbgen"
 	"gin-template-v2/internal/platform/httpx"
@@ -72,13 +71,11 @@ func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Eng
 
 	// --- Dependency wiring (one block per feature) ---
 	usersHandler := users.NewHandler(users.NewService(q))
-	organizationHandler := organization.NewHandler(organization.NewService(q))
 
 	// --- API v1 ---
 	v1 := r.Group("/api/v1")
 	auth.RegisterRoutes(v1, authHandler, authMiddleware)
 	users.RegisterRoutes(v1, usersHandler, authMiddleware, adminMiddleware)
-	organization.RegisterRoutes(v1, organizationHandler, authMiddleware)
 
 	return r
 }
