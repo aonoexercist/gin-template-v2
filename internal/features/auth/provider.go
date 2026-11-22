@@ -67,7 +67,7 @@ func (g *GoogleVerifier) Verify(ctx context.Context, token string) (*OAuthProfil
 
 	payload, err := idtoken.Validate(ctx, token, g.clientID)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidToken, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidToken, err)
 	}
 
 	if verified, ok := payload.Claims["email_verified"]; ok && !isEmailVerified(verified) {
