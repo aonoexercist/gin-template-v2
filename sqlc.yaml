@@ -14,9 +14,7 @@ sql:
     engine: postgresql
     schema: db/migrations
     queries:
-      - internal/features/user/query.sql
-      - internal/features/auth/query.sql
-      - internal/features/organization/query.sql
+      - internal/features/*/query.sql
     gen:
       go:
         package: dbgen
