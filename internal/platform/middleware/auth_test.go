@@ -97,7 +97,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	// Case 2: Invalid cookie -> 401
 	req = httptest.NewRequest("GET", "/protected", nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "invalid-token"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "invalid-token", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusUnauthorized {
@@ -106,7 +106,7 @@ func TestAuthMiddleware(t *testing.T) {
 
 	// Case 3: Valid cookie -> 200
 	req = httptest.NewRequest("GET", "/protected", nil)
-	req.AddCookie(&http.Cookie{Name: "sid", Value: "valid-session-secret"})
+	req.AddCookie(&http.Cookie{Name: "sid", Value: "valid-session-secret", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
