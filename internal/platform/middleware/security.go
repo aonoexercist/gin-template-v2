@@ -48,6 +48,7 @@ func CORS(allowed []string) gin.HandlerFunc {
 		} else {
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Add("Vary", "Origin")
+			h.Set("Access-Control-Allow-Credentials", "true")
 		}
 		h.Set("Access-Control-Expose-Headers", HeaderRequestID)
 
@@ -56,6 +57,9 @@ func CORS(allowed []string) gin.HandlerFunc {
 				http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions,
 			}, ", "))
 			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+HeaderRequestID)
+			if !allowAll {
+				h.Set("Access-Control-Allow-Credentials", "true")
+			}
 			h.Set("Access-Control-Max-Age", "600")
 			c.AbortWithStatus(http.StatusNoContent)
 			return

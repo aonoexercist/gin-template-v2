@@ -1,4 +1,4 @@
-package users
+package user
 
 import (
 	"errors"
@@ -15,23 +15,13 @@ type Handler struct{ svc Service }
 
 func NewHandler(svc Service) *Handler { return &Handler{svc: svc} }
 
-// RegisterRoutes mounts the feature on a (versioned) router group.
-func RegisterRoutes(rg *gin.RouterGroup, h *Handler) {
-	g := rg.Group("/users")
-	g.POST("", h.Create)
-	g.GET("", h.List)
-	g.GET("/:id", h.Get)
-	g.PATCH("/:id", h.Update)
-	g.DELETE("/:id", h.Delete)
-}
-
 func (h *Handler) Create(c *gin.Context) {
 	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		httpx.BindError(c, err)
 		return
 	}
-	u, err := h.svc.Create(c.Request.Context(), req.Email, req.Name)
+	u, err := h.svc.Create(c.Request.Context(), req.Email, req.Name, req.Password)
 	if err != nil {
 		h.fail(c, err)
 		return

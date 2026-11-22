@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.27.0
 
-package usersdb
+package dbgen
 
 import (
 	"context"

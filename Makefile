@@ -6,8 +6,8 @@ SHELL := /bin/bash
 export
 
 # Container engine: `make up` (docker) or `make up CONTAINER=podman`.
-CONTAINER ?= docker
-COMPOSE   ?= $(CONTAINER) compose
+CONTAINER ?= podman
+COMPOSE   ?= $(CONTAINER)-compose
 
 APP       := api
 MODULE    := $(shell go list -m 2>/dev/null)
@@ -23,7 +23,7 @@ help: ## Show this help
 	@awk 'BEGIN{FS=":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 ##@ Develop
-.PHONY: run dev build test cover lint fmt vet tidy
+.PHONY: run dev build test cover lint fmt vet tidy feature
 run: ## Run the API locally (needs a database: make db-up migrate-up)
 	go run ./cmd/api
 
@@ -51,6 +51,9 @@ vet: ## go vet
 tidy: ## go mod tidy
 	go mod tidy
 
+feature: ## Scaffold a new feature: make feature name=posts
+	@./scripts/scaffold-feature.sh "$(name)"
+
 ##@ Database
 .PHONY: sqlc migrate-up migrate-down migrate-status migrate-create db-up db-psql
 sqlc: ## Regenerate Go code from SQL (internal/features/*/queries.sql)
@@ -76,9 +79,12 @@ db-psql: ## Open psql inside the db container
 	$(COMPOSE) exec db psql -U $${POSTGRES_USER:-app} -d $${POSTGRES_DB:-app}
 
 ##@ Containers (docker or podman)
-.PHONY: up down logs image
+.PHONY: up up-tools down logs image
 up: ## Build and start db + migrations + api
 	$(COMPOSE) up -d --build
+
+up-tools: ## Build and start all services including dev tools (Adminer)
+	$(COMPOSE) --profile tools up -d --build
 
 down: ## Stop everything (keeps data volume)
 	$(COMPOSE) down
@@ -95,4 +101,4 @@ tools: ## Install goose, sqlc, air, golangci-lint
 	go install github.com/pressly/goose/v3/cmd/goose@v3.22.1
 	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.27.0
 	go install github.com/air-verse/air@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest

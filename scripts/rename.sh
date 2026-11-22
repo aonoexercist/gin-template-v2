@@ -3,7 +3,7 @@
 #   ./scripts/rename.sh github.com/acme/my-service
 set -euo pipefail
 
-OLD="github.com/your-username/gin-template"
+OLD="gin-template-v2"
 NEW="${1:?usage: $0 <new/module/path>}"
 
 cd "$(dirname "$0")/.."

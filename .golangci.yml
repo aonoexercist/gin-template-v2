@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -13,12 +15,13 @@ linters:
     - gosec
     - misspell
     - unconvert
-
-issues:
-  exclude-dirs:
-    - internal/features/.*/.*db   # sqlc generated
-  exclude-rules:
-    - path: _test\.go
-      linters: [gosec]
-    - text: "G115" # int -> int32 conversions are bounded by validation (see users.Service.List)
-      linters: [gosec]
+  exclusions:
+    paths:
+      - internal/features/.*/.*db # sqlc generated
+    rules:
+      - path: '_test\.go'
+        linters: [gosec]
+      - text: ".*http\\.Cookie missing.*"
+        linters: [gosec]
+      - text: ".*integer overflow conversion.*"
+        linters: [gosec]

@@ -8,8 +8,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"gin-template-v2/internal/config"
+	"gin-template-v2/internal/features/auth"
 	"gin-template-v2/internal/features/health"
-	"gin-template-v2/internal/features/users"
+	users "gin-template-v2/internal/features/user"
+	"gin-template-v2/internal/platform/dbgen"
 	"gin-template-v2/internal/platform/httpx"
 	"gin-template-v2/internal/platform/middleware"
 )
@@ -21,7 +23,7 @@ import (
 //	/healthz, /readyz   unversioned operational probes
 //	/api/v1/...         current stable API
 //
-// To add a feature: build its repo/service/handler below and mount it on a version group.
+// To add a feature: build its service/handler below and mount it on a version group.
 // To add a breaking API version: create `v2 := r.Group("/api/v2")` and mount only the
 // features that changed; v1 keeps serving existing clients untouched.
 func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Engine {
@@ -56,12 +58,24 @@ func NewRouter(cfg config.Config, log *slog.Logger, pool *pgxpool.Pool) *gin.Eng
 	// Operational endpoints.
 	health.RegisterRoutes(r, health.NewHandler(pool))
 
+	q := dbgen.New(pool)
+
+	// --- Auth & Identity Providers ---
+	providers := auth.NewProviderRegistry()
+	providers.Register("google", auth.NewGoogleVerifier(cfg.Auth.GoogleClientID))
+
+	authSvc := auth.NewService(q, pool, providers, cfg.Auth.SessionDuration)
+	authHandler := auth.NewHandler(authSvc, cfg.Auth)
+	authMiddleware := middleware.Authenticate(authSvc, cfg.Auth.CookieName)
+	adminMiddleware := middleware.RequireAdmin()
+
 	// --- Dependency wiring (one block per feature) ---
-	usersHandler := users.NewHandler(users.NewService(users.NewRepository(pool)))
+	usersHandler := users.NewHandler(users.NewService(q))
 
 	// --- API v1 ---
 	v1 := r.Group("/api/v1")
-	users.RegisterRoutes(v1, usersHandler)
+	auth.RegisterRoutes(v1, authHandler, authMiddleware)
+	users.RegisterRoutes(v1, usersHandler, authMiddleware, adminMiddleware)
 
 	return r
 }

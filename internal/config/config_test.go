@@ -7,6 +7,8 @@ import (
 
 func TestLoad_Defaults(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	t.Setenv("APP_ENV", "")
+	t.Setenv("LOG_FORMAT", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -23,6 +25,7 @@ func TestLoad_Defaults(t *testing.T) {
 func TestLoad_ProductionDefaultsToJSONLogs(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://u:p@localhost:5432/db")
 	t.Setenv("APP_ENV", "production")
+	t.Setenv("LOG_FORMAT", "")
 
 	cfg, err := Load()
 	if err != nil {

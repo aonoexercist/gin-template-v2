@@ -4,7 +4,7 @@ name: gin-template
 
 services:
   db:
-    image: docker.io/library/postgres:17-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-app}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
@@ -54,6 +54,20 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
+
+  # Development only: NEVER expose or run Adminer in production.
+  adminer:
+    image: adminer:latest
+    profiles:
+      - tools
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8088}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:
