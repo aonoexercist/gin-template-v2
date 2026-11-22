@@ -181,7 +181,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Service interface {
@@ -246,7 +245,7 @@ func (s *service) Update(ctx context.Context, id uuid.UUID, ${FIELD_VAR} *string
 		if v == "" {
 			return ${TYPE_NAME}{}, ErrInvalidInput
 		}
-		params.${FIELD_GO} = pgtype.Text{String: v, Valid: true}
+		params.${FIELD_GO} = &v
 	}
 
 	item, err := s.q.Update${TYPE_NAME}(ctx, params)
