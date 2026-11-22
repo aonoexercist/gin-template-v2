@@ -78,7 +78,7 @@ func (s *service) List(ctx context.Context, page, perPage int) ([]User, int64, e
 
 	items, err := s.q.ListUsers(ctx, dbgen.ListUsersParams{
 		PageLimit:  int32(perPage),
-		PageOffset: int32((page - 1) * perPage),
+		PageOffset: int32((page - 1) * perPage), // #nosec G115
 	})
 	if err != nil {
 		return nil, 0, err
